@@ -44,6 +44,8 @@ function handleEvent(event: Event) {
         return Promise.resolve(null);
     }
 
+    console.log(event)
+
     // use reply API
     return client.replyMessage({
         replyToken: event.replyToken || '',
