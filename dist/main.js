@@ -26,36 +26,18 @@ app.get('/', async (_, response) => {
         message: 'Connected successfully!',
     });
 });
-app.post('/callback', (0, bot_sdk_1.middleware)(middlewareConfig), async (request, response) => {
-    const callbackRequest = request.body;
-    const events = callbackRequest.events;
-    // Process all the received events asynchronously.
-    const results = await Promise.all(events.map(async (event) => {
-        try {
-            await textEventHandler(event);
-        }
-        catch (err) {
-            if (err instanceof bot_sdk_1.HTTPFetchError) {
-                console.error(err.status);
-                console.error(err.headers.get('x-line-request-id'));
-                console.error(err.body);
-            }
-            else if (err instanceof Error) {
-                console.error(err);
-            }
-            // Return an error message.
-            return response.status(500).json({
-                status: 'error',
-            });
-        }
-    }));
-    // Return a successful message.
-    response.status(200).json({
-        status: 'success',
-        results,
-    });
+
+app.post('/callback', line.middleware(config), (req, res) => {
+    Promise
+        .all(req.body.events.map(handleEvent))
+        .then((result) => res.json(result))
+        .catch((err) => {
+            console.error(err);
+            res.status(500).end();
+        });
 });
-const textEventHandler = async (event) => {
+
+const handleEvent = async (event) => {
     // Process all variables here.
     // Check if for a text message
     if (event.type !== 'message' || event.message.type !== 'text') {
@@ -70,8 +52,8 @@ const textEventHandler = async (event) => {
     await client.replyMessage({
         replyToken: event.replyToken,
         messages: [{
-                type: 'text',
-                text: event.message.text,
-            }],
+            type: 'text',
+            text: event.message.text,
+        }],
     });
 };
