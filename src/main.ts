@@ -4,7 +4,7 @@ import {
     ClientConfig,
     messagingApi,
     middleware,
-    MiddlewareConfig,
+    MiddlewareConfig
 } from '@line/bot-sdk';
 import { Event } from '@line/bot-sdk/dist/webhook/api';
 import express, { Application, Request, Response } from 'express';
@@ -44,11 +44,21 @@ function handleEvent(event: Event) {
         return Promise.resolve(null);
     }
 
-    // use reply API
-    return client.replyMessage({
-        replyToken: event.replyToken || '',
-        messages: [{ type: 'text', text: event.source?.userId || '' }],
-    });
+    client.getProfile(event.source?.userId || '')
+        .then((result) => {
+            // use reply API
+            return client.replyMessage({
+                replyToken: event.replyToken || '',
+                messages: [{ type: 'text', text: result.displayName }],
+            });
+        })
+        .catch((error) => {
+            // use reply API
+            return client.replyMessage({
+                replyToken: event.replyToken || '',
+                messages: [{ type: 'text', text: error.message }],
+            });
+        });
 };
 
 const port = process.env.PORT || 3000;
