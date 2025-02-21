@@ -41,7 +41,7 @@ app.get('/', async (_: Request, response: Response) => {
 app.post('/callback', middleware(middlewareConfig), (request: Request, response: Response) => {
     Promise
         .all(request.body.events.map(handleEvent))
-        .then((result) => response.json(result))
+        .then((result) => response.status(200).json(result))
         .catch((err) => {
             console.error(err);
             response.status(500).end();
