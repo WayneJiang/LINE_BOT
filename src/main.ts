@@ -47,7 +47,7 @@ function handleEvent(event: Event) {
     // use reply API
     return client.replyMessage({
         replyToken: event.replyToken || '',
-        messages: [{ type: 'text', text: JSON.stringify(event) }],
+        messages: [{ type: 'text', text: event.source?.userId || '' }],
     });
 };
 
