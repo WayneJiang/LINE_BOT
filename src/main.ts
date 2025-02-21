@@ -2,12 +2,9 @@ const env = require('dotenv').config();
 
 import {
     ClientConfig,
-    MessageAPIResponseBase,
     messagingApi,
     middleware,
     MiddlewareConfig,
-    webhook,
-    HTTPFetchError,
 } from '@line/bot-sdk';
 import { Event } from '@line/bot-sdk/dist/webhook/api';
 import express, { Application, Request, Response } from 'express';
@@ -26,11 +23,6 @@ const client = new messagingApi.MessagingApiClient(clientConfig);
 
 const app: Application = express();
 
-const port = process.env.PORT || 3000;
-app.listen(port, () => {
-    console.log(`listening on ${port}`);
-});
-
 app.get('/', async (_: Request, response: Response) => {
     response.status(200).json({
         status: 'success',
@@ -41,7 +33,7 @@ app.get('/', async (_: Request, response: Response) => {
 app.post('/callback', middleware(middlewareConfig), (request: Request, response: Response) => {
     Promise
         .all(request.body.events.map(handleEvent))
-        .then((result) => response.status(200).json(result))
+        .then((result) => response.json(result))
         .catch((err) => {
             console.error(err);
             response.status(500).end();
@@ -60,3 +52,8 @@ function handleEvent(event: Event) {
         messages: [{ type: 'text', text: event.message.text }],
     });
 };
+
+const port = process.env.PORT || 3000;
+app.listen(port, () => {
+    console.log(`listening on ${port}`);
+});
