@@ -29,7 +29,7 @@ app.get('/', async (_: Request, response: Response) => {
 });
 
 app.post('/callback', middleware(middlewareConfig), (request: Request, response: Response) => {
-    console.log('callback')
+    console.warn('callback')
 
     Promise
         .all(request.body.events.map(handleEvent))
