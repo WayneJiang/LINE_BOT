@@ -44,6 +44,8 @@ function handleEvent(event: Event) {
         return Promise.resolve(null);
     }
 
+    console.log(event)
+
     client.getProfile(event.source?.userId || '')
         .then((result) => {
             // use reply API
