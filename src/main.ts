@@ -44,12 +44,10 @@ function handleEvent(event: Event) {
         return Promise.resolve(null);
     }
 
-    console.log(event)
-
     // use reply API
     return client.replyMessage({
         replyToken: event.replyToken || '',
-        messages: [{ type: 'text', text: event.message.text }],
+        messages: [{ type: 'text', text: JSON.stringify(event) }],
     });
 };
 
