@@ -9,6 +9,7 @@ import {
     webhook,
     HTTPFetchError,
 } from '@line/bot-sdk';
+import { Event } from '@line/bot-sdk/dist/webhook/api';
 import express, { Application, Request, Response } from 'express';
 
 const clientConfig: ClientConfig = {
@@ -37,61 +38,25 @@ app.get('/', async (_: Request, response: Response) => {
     });
 });
 
-app.post('/callback', middleware(middlewareConfig),
-    async (request: Request, response: Response) => {
-        const callbackRequest: webhook.CallbackRequest = request.body;
-        const events: webhook.Event[] = callbackRequest.events!;
-
-        // Process all the received events asynchronously.
-        const results = await Promise.all(
-            events.map(async (event: webhook.Event) => {
-                try {
-                    await textEventHandler(event);
-                } catch (err: unknown) {
-                    if (err instanceof HTTPFetchError) {
-                        console.error(err.status);
-                        console.error(err.headers.get('x-line-request-id'));
-                        console.error(err.body);
-                    } else if (err instanceof Error) {
-                        console.error(err);
-                    }
-
-                    // Return an error message.
-                    return response.status(500).json({
-                        status: 'error',
-                    });
-                }
-            })
-        );
-
-        // Return a successful message.
-        response.status(200).json({
-            status: 'success',
-            results,
+app.post('/callback', middleware(middlewareConfig), (request: Request, response: Response) => {
+    Promise
+        .all(request.body.events.map(handleEvent))
+        .then((result) => response.json(result))
+        .catch((err) => {
+            console.error(err);
+            response.status(500).end();
         });
-    }
-);
+});
 
-const textEventHandler = async (event: webhook.Event): Promise<MessageAPIResponseBase | undefined> => {
-    // Process all variables here.
-
-    // Check if for a text message
+function handleEvent(event: Event) {
     if (event.type !== 'message' || event.message.type !== 'text') {
-        return;
+        // ignore non-text-message event
+        return Promise.resolve(null);
     }
 
-    // Process all message related variables here.
-
-    // Check if message is repliable
-    if (!event.replyToken) return;
-
-    // Create a new message.
-    // Reply to the user.
-    await client.replyMessage({
-        replyToken: event.replyToken,
-        messages: [{
-            type: 'text',
-            text: event.message.text,
-        }],
+    // use reply API
+    return client.replyMessage({
+        replyToken: event.replyToken || '',
+        messages: [{ type: 'text', text: event.message.text }],
     });
 };

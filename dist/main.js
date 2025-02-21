@@ -26,34 +26,24 @@ app.get('/', async (_, response) => {
         message: 'Connected successfully!',
     });
 });
-
-app.post('/callback', middleware(config), (request, response) => {
+app.post('/callback', (0, bot_sdk_1.middleware)(middlewareConfig), (request, response) => {
     Promise
         .all(request.body.events.map(handleEvent))
         .then((result) => response.json(result))
-        .catch((error) => {
-            console.error(error);
-            response.status(500).end();
-        });
-});
-
-const handleEvent = async (event) => {
-    // Process all variables here.
-    // Check if for a text message
-    if (event.type !== 'message' || event.message.type !== 'text') {
-        return;
-    }
-    // Process all message related variables here.
-    // Check if message is repliable
-    if (!event.replyToken)
-        return;
-    // Create a new message.
-    // Reply to the user.
-    await client.replyMessage({
-        replyToken: event.replyToken,
-        messages: [{
-            type: 'text',
-            text: event.message.text,
-        }],
+        .catch((err) => {
+        console.error(err);
+        response.status(500).end();
     });
-};
+});
+function handleEvent(event) {
+    if (event.type !== 'message' || event.message.type !== 'text') {
+        // ignore non-text-message event
+        return Promise.resolve(null);
+    }
+    // use reply API
+    return client.replyMessage({
+        replyToken: event.replyToken || '',
+        messages: [{ type: 'text', text: event.message.text }],
+    });
+}
+;
