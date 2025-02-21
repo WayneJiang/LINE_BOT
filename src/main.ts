@@ -29,7 +29,7 @@ app.get('/', async (_: Request, response: Response) => {
 });
 
 app.post('/callback', middleware(middlewareConfig), (request: Request, response: Response) => {
-    console.warn('callback')
+    console.info('callback')
 
     Promise
         .all(request.body.events.map(handleEvent))
@@ -46,7 +46,7 @@ function handleEvent(event: Event) {
         return Promise.resolve(null);
     }
 
-    console.log(event)
+    console.info(event)
 
     client.getProfile(event.source?.userId || '')
         .then((result) => {
