@@ -10,13 +10,11 @@ import { Event } from '@line/bot-sdk/dist/webhook/api';
 import express, { Application, Request, Response } from 'express';
 
 const clientConfig: ClientConfig = {
-    channelSecret: process.env.CHANNEL_SECRET || '',
-    channelAccessToken: process.env.CHANNEL_ACCESS_TOKEN || ''
+    channelAccessToken: process.env.CHANNEL_ACCESS_TOKEN || '',
 }
 
 const middlewareConfig: MiddlewareConfig = {
     channelSecret: process.env.CHANNEL_SECRET || '',
-    channelAccessToken: process.env.CHANNEL_ACCESS_TOKEN || ''
 }
 
 const client = new messagingApi.MessagingApiClient(clientConfig);
