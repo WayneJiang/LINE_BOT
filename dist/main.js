@@ -27,13 +27,13 @@ app.get('/', async (_, response) => {
     });
 });
 
-app.post('/callback', line.middleware(config), (req, res) => {
+app.post('/callback', middleware(config), (request, response) => {
     Promise
-        .all(req.body.events.map(handleEvent))
-        .then((result) => res.json(result))
-        .catch((err) => {
-            console.error(err);
-            res.status(500).end();
+        .all(request.body.events.map(handleEvent))
+        .then((result) => response.json(result))
+        .catch((error) => {
+            console.error(error);
+            response.status(500).end();
         });
 });
 
