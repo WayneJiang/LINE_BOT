@@ -31,38 +31,34 @@ app.get('/', async (_: Request, response: Response) => {
 app.post('/callback', middleware(middlewareConfig), (request: Request, response: Response) => {
     Promise
         .all(request.body.events.map(handleEvent))
-        .then((result) => //response.json(|)
-console.log(request.body);
-            )
+        .then((result) => {
+            // 設置 response header
+            response.set('ngrok-skip-browser-warning', 'true'); // 忽略 ngrok 警告
+            response.json(result);
+        })
         .catch((err) => {
             console.error(err);
             response.status(500).end();
         });
 });
 
-function handleEvent(event: Event) {
+function handleEvent(event) {
+		console.log(event);
     if (event.type !== 'message' || event.message.type !== 'text') {
         // ignore non-text-message event
         return Promise.resolve(null);
     }
 
-    client.getProfile(event.source?.userId || '')
-        .then((result) => {
-            // use reply API
-            console.log(result);
-            return client.replyMessage({
-                replyToken: event.replyToken || '',
-                messages: [{ type: 'text', text: 'callback' }],
-            });
-        })
-        .catch((error) => {
-            // use reply API
-            return client.replyMessage({
-                replyToken: event.replyToken || '',
-                messages: [{ type: 'text', text: error.message }],
-            });
-        });
-};
+    // create an echoing text message
+    let reply = "您說了：" + event.message.text;
+    const echo = { type: 'text', text: reply };
+
+    // use reply API
+    return client.replyMessage({
+        replyToken: event.replyToken,
+        messages: [echo],
+    });
+}
 
 const port = process.env.PORT || 3000;
 app.listen(port, () => {
