@@ -4,7 +4,7 @@
   "main": "dist/main.js",
   "type": "commonjs",
   "scripts": {
-    "build": "rm -rf dist && npx tsc ",
+    "build": "npm i && rm -rf dist && npx tsc",
     "start": "ts-node dist/main.js"
   },
   "dependencies": {
