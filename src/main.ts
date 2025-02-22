@@ -2,12 +2,13 @@ const env = require('dotenv').config();
 
 import {
     ClientConfig,
+    Message,
     messagingApi,
     middleware,
     MiddlewareConfig
 } from '@line/bot-sdk';
 import { Event } from '@line/bot-sdk/dist/webhook/api';
-import express, { Application, Request, Response } from 'express';
+import express, { Application, json, Request, Response } from 'express';
 
 const clientConfig: ClientConfig = {
     channelAccessToken: process.env.CHANNEL_ACCESS_TOKEN || '',
@@ -42,25 +43,37 @@ app.post('/callback', middleware(middlewareConfig), (request: Request, response:
         });
 });
 
-function handleEvent(event) {
-		console.log(event);
+async function handleEvent(event: Event) {
     if (event.type !== 'message' || event.message.type !== 'text') {
         // ignore non-text-message event
         return Promise.resolve(null);
     }
 
-    // create an echoing text message
-    let reply = "您說了：" + event.message.text;
-    const echo = { type: 'text', text: reply };
-
-    // use reply API
-    return client.replyMessage({
-        replyToken: event.replyToken,
-        messages: [echo],
+    await client.showLoadingAnimation({
+        chatId: event.source?.userId || '',
+        loadingSeconds: 5
     });
-}
 
-const port = process.env.PORT || 3000;
+    await new Promise(() => setTimeout(() => (
+        client.getProfile(event.source?.userId || '')
+            .then((result) => {
+                const msg: Message = { type: 'text', text: `${result.displayName}\n已簽到，抗中保台不缺席！` }
+
+                return client.replyMessage({
+                    replyToken: event.replyToken || '',
+                    messages: [msg]
+                });
+            })
+            .catch((error) => {
+                return client.replyMessage({
+                    replyToken: event.replyToken || '',
+                    messages: [{ type: 'text', text: error.message }],
+                });
+            })
+    ), 5000));
+};
+
+const port = process.env.PORT || 8000;
 app.listen(port, () => {
     console.log(`listening on ${port}`);
 });
