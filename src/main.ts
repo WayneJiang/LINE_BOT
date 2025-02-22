@@ -54,7 +54,7 @@ function handleEvent(event: Event) {
             // use reply API
             return client.replyMessage({
                 replyToken: event.replyToken || '',
-                messages: [{ type: 'text', text: result.displayName }],
+                messages: [{ type: 'text', text: 'callback' }],
             });
         })
         .catch((error) => {
