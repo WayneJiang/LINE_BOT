@@ -22,6 +22,7 @@ const client = new messagingApi.MessagingApiClient(clientConfig);
 const app: Application = express();
 
 app.get('/', async (_: Request, response: Response) => {
+    console.log('test')
     response.status(200).json({
         status: 'success',
         message: 'Connected successfully!',
