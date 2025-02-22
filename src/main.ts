@@ -34,7 +34,10 @@ app.post('/callback', middleware(middlewareConfig), (request: Request, response:
 
     Promise
         .all(request.body.events.map(handleEvent))
-        .then((result) => response.json(result))
+        .then((result) => response.json(client.replyMessage({
+                replyToken: event.replyToken || '',
+                messages: [{ type: 'text', text: 'callback' }],
+            })))
         .catch((err) => {
             console.error(err);
             response.status(500).end();
