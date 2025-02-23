@@ -49,28 +49,57 @@ async function handleEvent(event: Event) {
         return Promise.resolve(null);
     }
 
-    await client.showLoadingAnimation({
-        chatId: event.source?.userId || '',
-        loadingSeconds: 5
-    });
+    // await client.showLoadingAnimation({
+    //     chatId: event.source?.userId || '',
+    //     loadingSeconds: 5
+    // });
 
-    await new Promise(() => setTimeout(() => (
-        client.getProfile(event.source?.userId || '')
-            .then((result) => {
-                const msg: Message = { type: 'text', text: `${result.displayName}\n已簽到，抗中保台不缺席！` }
+    client.replyMessage(
+        {
+            replyToken: event.replyToken || '',
+            messages: [{
+                type: 'template',
+                altText: 'this is a buttons template',
+                template: {
+                    type: 'buttons',
+                    thumbnailImageUrl: 'https://example.com/bot/images/image.jpg',
+                    title: 'Menu',
+                    text: 'Please select',
+                    actions: [{
+                        type: 'postback',
+                        label: 'Buy',
+                        data: 'action=buy&itemid=123'
+                    }, {
+                        type: 'postback',
+                        label: 'Add to cart',
+                        data: 'action=add&itemid=123'
+                    }, {
+                        type: 'uri',
+                        label: 'View detail',
+                        uri: 'http://example.com/page/123'
+                    }]
+                }
+            }]
+        }
+    )
 
-                return client.replyMessage({
-                    replyToken: event.replyToken || '',
-                    messages: [msg]
-                });
-            })
-            .catch((error) => {
-                return client.replyMessage({
-                    replyToken: event.replyToken || '',
-                    messages: [{ type: 'text', text: error.message }],
-                });
-            })
-    ), 5000));
+    // await new Promise(() => setTimeout(() => (
+    //     client.getProfile(event.source?.userId || '')
+    //         .then((result) => {
+    //             const msg: Message = { type: 'text', text: `${result.displayName}\n已簽到，抗中保台不缺席！` }
+
+    //             return client.replyMessage({
+    //                 replyToken: event.replyToken || '',
+    //                 messages: [msg]
+    //             });
+    //         })
+    //         .catch((error) => {
+    //             return client.replyMessage({
+    //                 replyToken: event.replyToken || '',
+    //                 messages: [{ type: 'text', text: error.message }],
+    //             });
+    //         })
+    // ), 5000));
 };
 
 const port = process.env.PORT || 8000;

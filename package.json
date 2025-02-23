@@ -5,7 +5,8 @@
   "type": "commonjs",
   "scripts": {
     "build": "npm i && rm -rf dist && npx tsc",
-    "start": "ts-node dist/main.js"
+    "start": "ts-node dist/main.js",
+    "dev": "rm -rf dist && npx tsc && nodemon --watch src --ext ts --exec \"npx ts-node src/main.ts\""
   },
   "dependencies": {
     "@line/bot-sdk": "^9.7.1",
@@ -14,6 +15,7 @@
     "express": "^4.21.2",
     "from": "^0.1.7",
     "import": "^0.0.6",
+    "nodemon": "^3.1.9",
     "ts-node": "^10.9.2",
     "typescript": "^5.7.3"
   }
