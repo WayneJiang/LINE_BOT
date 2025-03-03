@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const env = require('dotenv').config();
 const bot_sdk_1 = require("@line/bot-sdk");
 const express_1 = __importDefault(require("express"));
+const moment_1 = __importDefault(require("moment"));
 const clientConfig = {
     channelAccessToken: process.env.CHANNEL_ACCESS_TOKEN || '',
 };
@@ -34,40 +35,60 @@ app.post('/callback', (0, bot_sdk_1.middleware)(middlewareConfig), (request, res
     });
 });
 async function handleEvent(event) {
-    if (event.type !== 'message' || event.message.type !== 'text') {
-        // ignore non-text-message event
-        return Promise.resolve(null);
+    if (event.type == 'message' && event.message.type == 'text') {
+        switch (event.message.text) {
+            case '簽到':
+                return client.replyMessage({
+                    replyToken: event.replyToken || '',
+                    messages: [{
+                            type: 'template',
+                            altText: '確認訊息',
+                            template: {
+                                type: 'confirm',
+                                text: `現在時間${(0, moment_1.default)()}確認要進行簽到嗎？`,
+                                actions: [
+                                    { label: '確認', type: 'postback', data: 'action=confirm' },
+                                    { label: '取消', type: 'postback', data: 'action=cancel' }
+                                ]
+                            }
+                        }]
+                });
+                break;
+        }
+    }
+    else if (event.type == 'postback') {
+        const data = event.postback.data;
+        await client.showLoadingAnimation({
+            chatId: event.source?.userId || '',
+            loadingSeconds: 5
+        });
+        if (data == 'action=confirm') {
+            return client.replyMessage({
+                replyToken: event.replyToken || '',
+                messages: [
+                    {
+                        type: 'text',
+                        text: 'replyMessage'
+                    }
+                ]
+            });
+        }
+        else if (data == 'action=cancel') {
+            return client.replyMessage({
+                replyToken: event.replyToken || '',
+                messages: [
+                    {
+                        type: 'text',
+                        text: 'replyMessage'
+                    }
+                ]
+            });
+        }
     }
     // await client.showLoadingAnimation({
     //     chatId: event.source?.userId || '',
     //     loadingSeconds: 5
     // });
-    client.replyMessage({
-        replyToken: event.replyToken || '',
-        messages: [{
-                type: 'template',
-                altText: 'this is a buttons template',
-                template: {
-                    type: 'buttons',
-                    thumbnailImageUrl: 'https://example.com/bot/images/image.jpg',
-                    title: 'Menu',
-                    text: 'Please select',
-                    actions: [{
-                            type: 'postback',
-                            label: 'Buy',
-                            data: 'action=buy&itemid=123'
-                        }, {
-                            type: 'postback',
-                            label: 'Add to cart',
-                            data: 'action=add&itemid=123'
-                        }, {
-                            type: 'uri',
-                            label: 'View detail',
-                            uri: 'http://example.com/page/123'
-                        }]
-                }
-            }]
-    });
     // await new Promise(() => setTimeout(() => (
     //     client.getProfile(event.source?.userId || '')
     //         .then((result) => {
