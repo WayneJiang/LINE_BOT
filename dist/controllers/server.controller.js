@@ -45,85 +45,32 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
     }
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.AppModule = void 0;
+exports.ServerController = void 0;
 var common_1 = require("@nestjs/common");
-var config_1 = require("@nestjs/config");
-var line_controller_1 = require("./controllers/line.controller");
-var line_service_1 = require("./services/line.service");
-var bot_sdk_1 = require("@line/bot-sdk");
-var typeorm_1 = require("@nestjs/typeorm");
-var typeorm_2 = require("typeorm");
-var server_controller_1 = require("./controllers/server.controller");
-var Trainee_1 = require("./entity/Trainee");
-var AppModule = /** @class */ (function () {
-    function AppModule(configService, dataSource) {
-        this.configService = configService;
-        this.dataSource = dataSource;
+var ServerController = /** @class */ (function () {
+    function ServerController() {
     }
-    AppModule.prototype.configure = function (consumer) {
-        var channelSecret = this.configService.get('CHANNEL_SECRET');
-        var middlewareConfig = {
-            channelSecret: channelSecret || ''
-        };
-        consumer
-            .apply((0, bot_sdk_1.middleware)(middlewareConfig))
-            .forRoutes({ path: '/line/*path', method: common_1.RequestMethod.ALL });
-    };
-    AppModule.prototype.onModuleInit = function () {
+    ServerController.prototype.healthCheck = function () {
         return __awaiter(this, void 0, void 0, function () {
-            var error_1;
             return __generator(this, function (_a) {
-                switch (_a.label) {
-                    case 0:
-                        _a.trys.push([0, 2, , 3]);
-                        return [4 /*yield*/, this.dataSource.query('SELECT 1')];
-                    case 1:
-                        _a.sent();
-                        console.log('✅ Database connected successfully!');
-                        return [3 /*break*/, 3];
-                    case 2:
-                        error_1 = _a.sent();
-                        console.error('❌ Database connection failed!', error_1);
-                        return [3 /*break*/, 3];
-                    case 3: return [2 /*return*/];
-                }
+                console.log();
+                return [2 /*return*/, {
+                        status: 200,
+                        message: 'Server alive'
+                    }];
             });
         });
     };
-    AppModule = __decorate([
-        (0, common_1.Module)({
-            imports: [
-                config_1.ConfigModule.forRoot({
-                    isGlobal: true
-                }),
-                typeorm_1.TypeOrmModule.forRootAsync({
-                    imports: [config_1.ConfigModule],
-                    inject: [config_1.ConfigService],
-                    useFactory: function (configService) { return __awaiter(void 0, void 0, void 0, function () {
-                        return __generator(this, function (_a) {
-                            return [2 /*return*/, ({
-                                    type: 'postgres',
-                                    host: configService.get('DB_HOST'),
-                                    port: configService.get('DB_PORT'),
-                                    username: configService.get('DB_USERNAME'),
-                                    password: configService.get('DB_PASSWORD'),
-                                    database: configService.get('DB_DATABASE'),
-                                    synchronize: configService.get('DB_SYNCHRONIZE'),
-                                    autoLoadEntities: true,
-                                    ssl: true,
-                                    entities: [__dirname + '/**/*.entity{.ts,.js}']
-                                })];
-                        });
-                    }); },
-                }),
-                typeorm_1.TypeOrmModule.forFeature([Trainee_1.Trainee])
-            ],
-            controllers: [server_controller_1.ServerController, line_controller_1.LineController],
-            providers: [line_service_1.LineService]
-        }),
-        __metadata("design:paramtypes", [config_1.ConfigService, typeorm_2.DataSource])
-    ], AppModule);
-    return AppModule;
+    __decorate([
+        (0, common_1.Get)(),
+        __metadata("design:type", Function),
+        __metadata("design:paramtypes", []),
+        __metadata("design:returntype", Promise)
+    ], ServerController.prototype, "healthCheck", null);
+    ServerController = __decorate([
+        (0, common_1.Controller)()
+    ], ServerController);
+    return ServerController;
 }());
-exports.AppModule = AppModule;
-//# sourceMappingURL=app.module.js.map
+exports.ServerController = ServerController;
+//# sourceMappingURL=server.controller.js.map

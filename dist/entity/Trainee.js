@@ -9,31 +9,35 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.User = void 0;
+exports.Trainee = void 0;
 var typeorm_1 = require("typeorm");
-var User = /** @class */ (function () {
-    function User() {
+var Trainee = /** @class */ (function () {
+    function Trainee() {
     }
     __decorate([
         (0, typeorm_1.PrimaryGeneratedColumn)(),
         __metadata("design:type", Number)
-    ], User.prototype, "id", void 0);
+    ], Trainee.prototype, "id", void 0);
     __decorate([
         (0, typeorm_1.Column)(),
         __metadata("design:type", String)
-    ], User.prototype, "firstName", void 0);
+    ], Trainee.prototype, "name", void 0);
     __decorate([
-        (0, typeorm_1.Column)(),
-        __metadata("design:type", String)
-    ], User.prototype, "lastName", void 0);
+        (0, typeorm_1.CreateDateColumn)(),
+        __metadata("design:type", Date)
+    ], Trainee.prototype, "createdDate", void 0);
     __decorate([
-        (0, typeorm_1.Column)(),
-        __metadata("design:type", Number)
-    ], User.prototype, "age", void 0);
-    User = __decorate([
-        (0, typeorm_1.Entity)()
-    ], User);
-    return User;
+        (0, typeorm_1.UpdateDateColumn)(),
+        __metadata("design:type", Date)
+    ], Trainee.prototype, "updatedDate", void 0);
+    __decorate([
+        (0, typeorm_1.DeleteDateColumn)(),
+        __metadata("design:type", Date)
+    ], Trainee.prototype, "deletedDate", void 0);
+    Trainee = __decorate([
+        (0, typeorm_1.Entity)('Trainee')
+    ], Trainee);
+    return Trainee;
 }());
-exports.User = User;
-//# sourceMappingURL=User.js.map
+exports.Trainee = Trainee;
+//# sourceMappingURL=Trainee.js.map

@@ -23,6 +23,8 @@ export class LineService {
             return;
         }
 
+        console.log('Receive textmessage event');
+
         const replyToken = event.replyToken;
 
         switch (event.message.text) {
@@ -53,6 +55,8 @@ export class LineService {
         if (event.type != 'postback') {
             return;
         }
+
+        console.log('Receive postback event');
 
         const replyToken = event.replyToken;
 

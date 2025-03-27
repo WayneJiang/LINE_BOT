@@ -5,6 +5,8 @@ import { LineService } from './services/line.service';
 import { middleware, MiddlewareConfig } from '@line/bot-sdk';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
+import { ServerController } from './controllers/server.controller';
+import { Trainee } from './entity/Trainee';
 
 @Module({
   imports: [
@@ -23,11 +25,13 @@ import { DataSource } from 'typeorm';
         database: configService.get<string>('DB_DATABASE'),
         synchronize: configService.get<boolean>('DB_SYNCHRONIZE'),
         autoLoadEntities: true,
-        ssl: true
+        ssl: true,
+        entities: [__dirname + '/**/*.entity{.ts,.js}']
       }),
-    })
+    }),
+    TypeOrmModule.forFeature([Trainee])
   ],
-  controllers: [LineController],
+  controllers: [ServerController, LineController],
   providers: [LineService]
 })
 export class AppModule implements NestModule, OnModuleInit {

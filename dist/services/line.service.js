@@ -66,6 +66,7 @@ var LineService = /** @class */ (function () {
                 if (event.message.type != 'text') {
                     return [2 /*return*/];
                 }
+                console.log('Receive textmessage event');
                 replyToken = event.replyToken;
                 switch (event.message.text) {
                     case '簽到':
@@ -102,6 +103,7 @@ var LineService = /** @class */ (function () {
                         if (event.type != 'postback') {
                             return [2 /*return*/];
                         }
+                        console.log('Receive postback event');
                         replyToken = event.replyToken;
                         data = event.postback.data;
                         return [4 /*yield*/, this.messagingApiClient.showLoadingAnimation({
