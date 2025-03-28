@@ -37,9 +37,10 @@ let LineService = class LineService {
         console.log('Receive textmessage event');
         const replyToken = event.replyToken;
         const now = (0, moment_timezone_1.utc)().tz('Asia/Taipei');
+        let lineResponse;
         switch (event.message.text) {
             case '簽到':
-                this.messagingApiClient.replyMessage({
+                lineResponse = await this.messagingApiClient.replyMessage({
                     replyToken: replyToken,
                     messages: [{
                             type: 'template',
@@ -57,17 +58,17 @@ let LineService = class LineService {
                 break;
             case '個人資訊':
                 const count = await this.traineeRepository.count();
-                const response = await this.messagingApiClient.replyMessage({
+                lineResponse = await this.messagingApiClient.replyMessage({
                     replyToken: replyToken,
                     messages: [{
                             type: 'text',
                             text: `查詢成功\n\n截至${now.format('YYYY/MM/DD')}為止\n已簽到${count}次`
                         }]
                 });
-                console.log(response);
                 break;
         }
         ;
+        console.log(lineResponse);
     }
     async handlePostBack(event) {
         if (event.type != 'postback') {

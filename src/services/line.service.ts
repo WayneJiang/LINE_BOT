@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ClientConfig, MessageEvent, messagingApi, Postback, PostbackEvent } from '@line/bot-sdk';
-import { MessagingApiClient } from '@line/bot-sdk/dist/messaging-api/api';
+import { MessagingApiClient, ReplyMessageResponse } from '@line/bot-sdk/dist/messaging-api/api';
 import { utc } from 'moment-timezone';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Trainee } from 'src/entities/Trainee.entity';
@@ -32,10 +32,11 @@ export class LineService {
 
         const replyToken = event.replyToken;
         const now = utc().tz('Asia/Taipei');
+        let lineResponse: ReplyMessageResponse;
 
         switch (event.message.text) {
             case '簽到':
-                this.messagingApiClient.replyMessage({
+                lineResponse = await this.messagingApiClient.replyMessage({
                     replyToken: replyToken,
                     messages:
                         [{
@@ -55,7 +56,7 @@ export class LineService {
             case '個人資訊':
                 const count = await this.traineeRepository.count();
 
-                const response = await
+                lineResponse = await
                     this.messagingApiClient.replyMessage({
                         replyToken: replyToken,
                         messages:
@@ -65,9 +66,10 @@ export class LineService {
                             }]
                     });
 
-                console.log(response);
                 break;
         };
+
+        console.log(lineResponse);
     }
 
     async handlePostBack(event: PostbackEvent): Promise<void> {
