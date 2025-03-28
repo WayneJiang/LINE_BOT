@@ -55,14 +55,17 @@ export class LineService {
             case '個人資訊':
                 const count = await this.traineeRepository.count();
 
-                this.messagingApiClient.replyMessage({
-                    replyToken: replyToken,
-                    messages:
-                        [{
-                            type: 'text',
-                            text: `查詢成功\n\n截至${now.format('YYYY/MM/DD')}為止\n已簽到${count}次`
-                        }]
-                });
+                const response = await
+                    this.messagingApiClient.replyMessage({
+                        replyToken: replyToken,
+                        messages:
+                            [{
+                                type: 'text',
+                                text: `查詢成功\n\n截至${now.format('YYYY/MM/DD')}為止\n已簽到${count}次`
+                            }]
+                    });
+
+                console.log(response);
                 break;
         };
     }
