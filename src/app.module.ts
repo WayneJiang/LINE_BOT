@@ -6,7 +6,8 @@ import { middleware, MiddlewareConfig } from '@line/bot-sdk';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { ServerController } from './controllers/server.controller';
-import { Trainee } from './entity/Trainee';
+import ormconfig from '../database/ormconfig';
+import { Trainee } from './entities/Trainee.entity';
 
 @Module({
   imports: [
@@ -18,16 +19,14 @@ import { Trainee } from './entity/Trainee';
       inject: [ConfigService],
       useFactory: async (configService: ConfigService) => ({
         type: 'postgres',
-        host: configService.get<string>('DB_HOST'),
-        port: configService.get<number>('DB_PORT'),
-        username: configService.get<string>('DB_USERNAME'),
-        password: configService.get<string>('DB_PASSWORD'),
-        database: configService.get<string>('DB_DATABASE'),
-        synchronize: configService.get<boolean>('DB_SYNCHRONIZE'),
+        host: configService.get<string>('POSTGRES_HOST'),
+        port: 5432,
+        username: configService.get<string>('POSTGRES_USER'),
+        password: configService.get<string>('POSTGRES_PASSWORD'),
+        database: configService.get<string>('POSTGRES_DATABASE'),
         autoLoadEntities: true,
-        ssl: true,
-        entities: [__dirname + '/**/*.entity{.ts,.js}']
-      }),
+        ssl: true
+      })
     }),
     TypeOrmModule.forFeature([Trainee])
   ],

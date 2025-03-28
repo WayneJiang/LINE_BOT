@@ -18,11 +18,10 @@
       "test:cov": "jest --coverage",
       "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
       "test:e2e": "jest --config ./test/jest-e2e.json",
-      "typeorm:show": "npx ts-node -r tsconfig-paths/register node_modules/typeorm/cli.js --data-source database/ormconfig.ts migration:show",
-      "typeorm:generate": "npx ts-node -r tsconfig-paths/register node_modules/typeorm/cli.js --data-source database/ormconfig.ts migration:generate database/migrations/$npm_config_name",
-      "migrate:run": "npx ts-node -r tsconfig-paths/register node_modules/typeorm/cli.js --data-source database/ormconfig.ts migration:run",
-      "typeorm:revert": "npx ts-node -r tsconfig-paths/register node_modules/typeorm/cli.js --data-source database/ormconfig.ts migration:revert",
-      "typeorm:create": "npx ts-node -r tsconfig-paths/register node_modules/typeorm/cli.js --data-source database/ormconfig.ts migration:create Create"
+      "typeorm:show": "typeorm-ts-node-commonjs -d ./database/ormconfig.ts migration:show",
+      "typeorm:generate": "typeorm-ts-node-commonjs -d ./database/ormconfig.ts migration:generate ./database/migrations/$npm_config_nam",
+      "typeorm:run": "typeorm-ts-node-commonjs -d ./database/ormconfig.ts migration:run",
+      "typeorm:revert": "typeorm-ts-node-commonjs -d ./database/ormconfig.ts migration:revert"
    },
    "dependencies": {
       "@line/bot-sdk": "^9.7.1",

@@ -6,6 +6,9 @@ export class Trainee {
     id: number
 
     @Column()
+    socialId: string
+
+    @Column()
     name: string
 
     @CreateDateColumn()

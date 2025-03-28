@@ -1,20 +1,19 @@
-import 'reflect-metadata';
+import * as dotenv from 'dotenv';
 import { DataSource } from 'typeorm';
-import { ConfigService } from '@nestjs/config';
-import { config } from 'dotenv';
+import { join } from 'path';
 
-config();
-const configService = new ConfigService();
+dotenv.config();
 
-export const AppDataSource = new DataSource({
+const dataSource = new DataSource({
     type: 'postgres',
-    host: configService.get<string>('DB_HOST'),
-    port: configService.get<number>('DB_PORT'),
-    username: configService.get<string>('DB_USERNAME'),
-    password: configService.get<string>('DB_PASSWORD'),
-    database: configService.get<string>('DB_DATABASE'),
-    synchronize: configService.get<boolean>('DB_SYNCHRONIZE'),
-    migrations: ['dist/migrations/*.js'],
-    entities: ['dist/**/*.entity.js'],
-    ssl: true
+    url: process.env.DB_HOST,
+    entities: [join(__dirname, '../src/entities/*.entity.ts')],
+    migrations: [join(__dirname, './migrations/*.ts')],
+    synchronize: false,
+    logging: true,
+    ssl: {
+        rejectUnauthorized: false,
+    },
 });
+
+export default dataSource;
