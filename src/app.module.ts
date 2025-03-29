@@ -7,7 +7,9 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { ServerController } from './controllers/server.controller';
 import ormconfig from '../database/ormconfig';
-import { Trainee } from './entities/Trainee.entity';
+import { Trainee } from './entities/trainee.entity';
+import { TrainingPlan } from './entities/trainingPlan.entity';
+import { TrainingRecord } from './entities/trainingRecord.entity';
 
 @Module({
   imports: [
@@ -28,7 +30,7 @@ import { Trainee } from './entities/Trainee.entity';
         ssl: true
       })
     }),
-    TypeOrmModule.forFeature([Trainee])
+    TypeOrmModule.forFeature([Trainee, TrainingPlan, TrainingRecord])
   ],
   controllers: [ServerController, LineController],
   providers: [LineService]

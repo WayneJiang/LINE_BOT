@@ -9,46 +9,34 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.Trainee = void 0;
+exports.TrainingRecord = void 0;
 const typeorm_1 = require("typeorm");
-const trainingRecord_entity_1 = require("./trainingRecord.entity");
-const trainingPlan_entity_1 = require("./trainingPlan.entity");
-let Trainee = class Trainee {
+const trainee_entity_1 = require("./trainee.entity");
+let TrainingRecord = class TrainingRecord {
 };
-exports.Trainee = Trainee;
+exports.TrainingRecord = TrainingRecord;
 __decorate([
     (0, typeorm_1.PrimaryGeneratedColumn)(),
     __metadata("design:type", Number)
-], Trainee.prototype, "id", void 0);
-__decorate([
-    (0, typeorm_1.Column)(),
-    __metadata("design:type", String)
-], Trainee.prototype, "socialId", void 0);
-__decorate([
-    (0, typeorm_1.Column)(),
-    __metadata("design:type", String)
-], Trainee.prototype, "name", void 0);
+], TrainingRecord.prototype, "id", void 0);
 __decorate([
     (0, typeorm_1.CreateDateColumn)(),
     __metadata("design:type", Date)
-], Trainee.prototype, "createdDate", void 0);
+], TrainingRecord.prototype, "createdDate", void 0);
 __decorate([
     (0, typeorm_1.UpdateDateColumn)(),
     __metadata("design:type", Date)
-], Trainee.prototype, "updatedDate", void 0);
+], TrainingRecord.prototype, "updatedDate", void 0);
 __decorate([
     (0, typeorm_1.DeleteDateColumn)(),
     __metadata("design:type", Date)
-], Trainee.prototype, "deletedDate", void 0);
+], TrainingRecord.prototype, "deletedDate", void 0);
 __decorate([
-    (0, typeorm_1.OneToMany)(() => trainingPlan_entity_1.TrainingPlan, (trainingPlan) => trainingPlan.trainee),
-    __metadata("design:type", Array)
-], Trainee.prototype, "trainingPlan", void 0);
-__decorate([
-    (0, typeorm_1.OneToMany)(() => trainingRecord_entity_1.TrainingRecord, (trainingRecord) => trainingRecord.trainee),
-    __metadata("design:type", Array)
-], Trainee.prototype, "trainingRecord", void 0);
-exports.Trainee = Trainee = __decorate([
-    (0, typeorm_1.Entity)('Trainee')
-], Trainee);
-//# sourceMappingURL=trainee.entity.js.map
+    (0, typeorm_1.ManyToOne)(() => trainee_entity_1.Trainee, (trainee) => trainee.trainingRecord),
+    (0, typeorm_1.JoinColumn)({ name: 'trainee' }),
+    __metadata("design:type", trainee_entity_1.Trainee)
+], TrainingRecord.prototype, "trainee", void 0);
+exports.TrainingRecord = TrainingRecord = __decorate([
+    (0, typeorm_1.Entity)('TrainingRecord')
+], TrainingRecord);
+//# sourceMappingURL=trainingRecord.entity.js.map

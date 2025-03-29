@@ -19,7 +19,7 @@
       "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
       "test:e2e": "jest --config ./test/jest-e2e.json",
       "typeorm:show": "typeorm-ts-node-commonjs -d ./database/ormconfig.ts migration:show",
-      "typeorm:generate": "typeorm-ts-node-commonjs -d ./database/ormconfig.ts migration:generate ./database/migrations/$npm_config_nam",
+      "typeorm:generate": "typeorm-ts-node-commonjs -d ./database/ormconfig.ts migration:generate ./database/migrations/$npm_config_name",
       "typeorm:run": "typeorm-ts-node-commonjs -d ./database/ormconfig.ts migration:run",
       "typeorm:revert": "typeorm-ts-node-commonjs -d ./database/ormconfig.ts migration:revert"
    },

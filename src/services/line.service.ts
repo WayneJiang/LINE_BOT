@@ -4,16 +4,21 @@ import { ClientConfig, MessageEvent, messagingApi, Postback, PostbackEvent } fro
 import { MessagingApiClient, ReplyMessageResponse } from '@line/bot-sdk/dist/messaging-api/api';
 import { utc } from 'moment-timezone';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Trainee } from 'src/entities/Trainee.entity';
+import { Trainee } from 'src/entities/trainee.entity';
 import { Repository } from 'typeorm';
+import { TrainingRecord } from 'src/entities/trainingRecord.entity';
 
 @Injectable()
 export class LineService {
     private messagingApiClient: MessagingApiClient;
 
     constructor(
-        private configService: ConfigService, @InjectRepository(Trainee)
-        private traineeRepository: Repository<Trainee>) {
+        private configService: ConfigService,
+        @InjectRepository(Trainee)
+        private traineeRepository: Repository<Trainee>,
+        @InjectRepository(TrainingRecord)
+        private trainingRecordRepository: Repository<TrainingRecord>) {
+
         const channelAccessToken = this.configService.get<string>('CHANNEL_ACCESS_TOKEN');
 
         const clientConfig: ClientConfig = {
@@ -40,30 +45,210 @@ export class LineService {
                     replyToken: replyToken,
                     messages:
                         [{
-                            type: 'template',
-                            altText: '確認訊息',
-                            template: {
-                                type: 'confirm',
-                                text: `現在時間\n\n${now.format('YYYY/MM/DD HH:mm:ss')}\n\n確認要進行簽到嗎？`,
-                                actions: [
-                                    { label: '確認', type: 'postback', data: 'action=confirm' },
-                                    { label: '取消', type: 'postback', data: 'action=cancel' }
-                                ]
+                            type: 'flex',
+                            altText: '簽到',
+                            contents: {
+                                type: 'bubble',
+                                body: {
+                                    type: 'box',
+                                    layout: 'vertical',
+                                    spacing: 'md',
+                                    contents: [
+                                        {
+                                            type: 'text',
+                                            text: `簽到`,
+                                            weight: 'bold'
+                                        },
+                                        { type: 'separator' },
+                                        {
+                                            type: 'text',
+                                            contents: [
+                                                {
+                                                    type: 'span',
+                                                    text: `現在時間\n`
+                                                },
+                                                {
+                                                    type: 'span',
+                                                    text: `${now.format('YYYY/MM/DD HH:mm:ss')}\n\n`,
+                                                    weight: 'bold',
+                                                },
+                                                {
+                                                    type: 'span',
+                                                    text: '要進行簽到嗎？',
+                                                    color: '#ff0000',
+                                                    weight: 'bold',
+                                                    size: 'lg'
+                                                }
+                                            ],
+                                            wrap: true
+                                        },
+                                        {
+                                            type: 'button',
+                                            style: 'primary',
+                                            action:
+                                            {
+                                                label: '確認',
+                                                type: 'postback',
+                                                data: 'action=confirm'
+                                            }
+                                        },
+                                        {
+                                            type: 'button',
+                                            style: 'secondary',
+                                            action: {
+                                                label: '取消',
+                                                type: 'postback',
+                                                data: 'action=cancel'
+                                            }
+                                        }
+                                    ]
+                                }
                             }
-                        }]
+                        }
+                        ]
                 });
                 break;
             case '個人資訊':
-                const count = await this.traineeRepository.count();
+                await this.messagingApiClient.showLoadingAnimation({
+                    chatId: event.source?.userId || '',
+                    loadingSeconds: 10
+                });
+
+                const info =
+                    await this.traineeRepository.findOne
+                        ({
+                            relations: ['trainingPlan', 'trainingRecord'],
+                            where: { 'socialId': event.source.userId }
+                        });
 
                 lineResponse = await
                     this.messagingApiClient.replyMessage({
                         replyToken: replyToken,
                         messages:
                             [{
-                                type: 'text',
-                                text: `查詢成功\n\n截至${now.format('YYYY/MM/DD')}為止\n已簽到${count}次`
-                            }]
+                                type: 'flex',
+                                altText: '個人資訊',
+                                contents: {
+                                    type: 'bubble',
+                                    body: {
+                                        type: 'box',
+                                        layout: 'vertical',
+                                        spacing: 'md',
+                                        contents: [
+                                            {
+                                                type: 'text',
+                                                text: `${info.name} 查詢成功`,
+                                                wrap: true,
+                                                weight: 'bold'
+                                            },
+                                            { type: 'separator' },
+                                            {
+                                                type: 'text',
+                                                text: `訓練計畫\n\n`,
+                                            },
+                                            {
+                                                type: 'text',
+                                                contents: [
+                                                    {
+                                                        type: 'span',
+                                                        text: '從'
+                                                    },
+                                                    {
+                                                        type: 'span',
+                                                        text: ` ${info.createdDate.toLocaleDateString()} `,
+                                                        size: 'lg',
+                                                        weight: 'bold'
+                                                    },
+                                                    {
+                                                        type: 'span',
+                                                        text: '開始'
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                type: 'text',
+                                                contents: [
+                                                    {
+                                                        type: 'span',
+                                                        text: '規劃'
+                                                    },
+                                                    {
+                                                        type: 'span',
+                                                        text: ` ${info.trainingPlan[info.trainingPlan.length - 1].quota} `,
+                                                        color: '#0000ff',
+                                                        size: 'xxl',
+                                                        weight: 'bold'
+                                                    },
+                                                    {
+                                                        type: 'span',
+                                                        text: '次'
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                type: 'text',
+                                                contents: [
+                                                    {
+                                                        type: 'span',
+                                                        text: '截至'
+                                                    },
+                                                    {
+                                                        type: 'span',
+                                                        text: ` ${now.format('YYYY/MM/DD')} `,
+                                                        size: 'lg',
+                                                        weight: 'bold'
+                                                    },
+                                                    {
+                                                        type: 'span',
+                                                        text: '為止'
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                type: 'text',
+                                                contents: [
+                                                    {
+                                                        type: 'span',
+                                                        text: '已簽到'
+                                                    },
+                                                    {
+                                                        type: 'span',
+                                                        text: ` ${info.trainingRecord.length} `,
+                                                        color: '#008000',
+                                                        size: 'xxl',
+                                                        weight: 'bold'
+                                                    },
+                                                    {
+                                                        type: 'span',
+                                                        text: '次'
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                type: 'text',
+                                                contents: [
+                                                    {
+                                                        type: 'span',
+                                                        text: `剩餘`
+                                                    },
+                                                    {
+                                                        type: 'span',
+                                                        text: ` ${info.trainingPlan[info.trainingPlan.length - 1].quota - info.trainingRecord.length} `,
+                                                        color: '#ffa500',
+                                                        size: 'xxl',
+                                                        weight: 'bold'
+                                                    },
+                                                    {
+                                                        type: 'span',
+                                                        text: '次'
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    }
+                                }
+                            }
+                            ]
                     });
 
                 break;
@@ -89,13 +274,14 @@ export class LineService {
         });
 
         const profile = await this.messagingApiClient.getProfile(event.source?.userId || '');
-        console.log(profile.displayName);
+        console.log(JSON.stringify(profile));
 
         if (data == 'action=confirm') {
-            await this.traineeRepository.save(
-                this.traineeRepository.create({
-                    socialId: profile.userId,
-                    name: profile.displayName
+            const trainee = await this.traineeRepository.findOne({ where: { socialId: profile.userId } });
+
+            await this.trainingRecordRepository.save(
+                this.trainingRecordRepository.create({
+                    trainee: trainee
                 })
             );
 
