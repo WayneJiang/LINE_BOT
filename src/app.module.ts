@@ -8,8 +8,8 @@ import { DataSource } from 'typeorm';
 import { ServerController } from './controllers/server.controller';
 import ormconfig from '../database/ormconfig';
 import { Trainee } from './entities/trainee.entity';
-import { TrainingPlan } from './entities/trainingPlan.entity';
-import { TrainingRecord } from './entities/trainingRecord.entity';
+import { TrainingPlan } from './entities/training-plan.entity';
+import { TrainingRecord } from './entities/training-record.entity';
 
 @Module({
   imports: [

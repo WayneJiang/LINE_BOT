@@ -20,7 +20,7 @@ const moment_timezone_1 = require("moment-timezone");
 const typeorm_1 = require("@nestjs/typeorm");
 const trainee_entity_1 = require("../entities/trainee.entity");
 const typeorm_2 = require("typeorm");
-const trainingRecord_entity_1 = require("../entities/trainingRecord.entity");
+const training_record_entity_1 = require("../entities/training-record.entity");
 let LineService = class LineService {
     constructor(configService, traineeRepository, trainingRecordRepository) {
         this.configService = configService;
@@ -283,7 +283,7 @@ exports.LineService = LineService;
 exports.LineService = LineService = __decorate([
     (0, common_1.Injectable)(),
     __param(1, (0, typeorm_1.InjectRepository)(trainee_entity_1.Trainee)),
-    __param(2, (0, typeorm_1.InjectRepository)(trainingRecord_entity_1.TrainingRecord)),
+    __param(2, (0, typeorm_1.InjectRepository)(training_record_entity_1.TrainingRecord)),
     __metadata("design:paramtypes", [config_1.ConfigService,
         typeorm_2.Repository,
         typeorm_2.Repository])

@@ -6,7 +6,7 @@ import { utc } from 'moment-timezone';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Trainee } from 'src/entities/trainee.entity';
 import { Repository } from 'typeorm';
-import { TrainingRecord } from 'src/entities/trainingRecord.entity';
+import { TrainingRecord } from 'src/entities/training-record.entity';
 
 @Injectable()
 export class LineService {

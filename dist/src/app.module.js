@@ -19,8 +19,8 @@ const typeorm_1 = require("@nestjs/typeorm");
 const typeorm_2 = require("typeorm");
 const server_controller_1 = require("./controllers/server.controller");
 const trainee_entity_1 = require("./entities/trainee.entity");
-const trainingPlan_entity_1 = require("./entities/trainingPlan.entity");
-const trainingRecord_entity_1 = require("./entities/trainingRecord.entity");
+const training_plan_entity_1 = require("./entities/training-plan.entity");
+const training_record_entity_1 = require("./entities/training-record.entity");
 let AppModule = class AppModule {
     constructor(configService, dataSource) {
         this.configService = configService;
@@ -66,7 +66,7 @@ exports.AppModule = AppModule = __decorate([
                     ssl: true
                 })
             }),
-            typeorm_1.TypeOrmModule.forFeature([trainee_entity_1.Trainee, trainingPlan_entity_1.TrainingPlan, trainingRecord_entity_1.TrainingRecord])
+            typeorm_1.TypeOrmModule.forFeature([trainee_entity_1.Trainee, training_plan_entity_1.TrainingPlan, training_record_entity_1.TrainingRecord])
         ],
         controllers: [server_controller_1.ServerController, line_controller_1.LineController],
         providers: [line_service_1.LineService]

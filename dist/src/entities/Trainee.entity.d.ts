@@ -1,5 +1,5 @@
-import { TrainingRecord } from "./trainingRecord.entity";
-import { TrainingPlan } from "./trainingPlan.entity";
+import { TrainingRecord } from "./training-record.entity";
+import { TrainingPlan } from "./training-plan.entity";
 export declare class Trainee {
     id: number;
     socialId: string;

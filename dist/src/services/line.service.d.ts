@@ -2,7 +2,7 @@ import { ConfigService } from '@nestjs/config';
 import { MessageEvent, PostbackEvent } from '@line/bot-sdk';
 import { Trainee } from 'src/entities/trainee.entity';
 import { Repository } from 'typeorm';
-import { TrainingRecord } from 'src/entities/trainingRecord.entity';
+import { TrainingRecord } from 'src/entities/training-record.entity';
 export declare class LineService {
     private configService;
     private traineeRepository;

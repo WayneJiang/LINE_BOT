@@ -1,6 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, DeleteDateColumn, OneToMany } from "typeorm"
-import { TrainingRecord } from "./trainingRecord.entity"
-import { TrainingPlan } from "./trainingPlan.entity"
+import { TrainingRecord } from "./training-record.entity"
+import { TrainingPlan } from "./training-plan.entity"
 
 @Entity('Trainee')
 export class Trainee {

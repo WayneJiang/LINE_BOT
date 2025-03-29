@@ -11,8 +11,8 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Trainee = void 0;
 const typeorm_1 = require("typeorm");
-const trainingRecord_entity_1 = require("./trainingRecord.entity");
-const trainingPlan_entity_1 = require("./trainingPlan.entity");
+const training_record_entity_1 = require("./training-record.entity");
+const training_plan_entity_1 = require("./training-plan.entity");
 let Trainee = class Trainee {
 };
 exports.Trainee = Trainee;
@@ -41,11 +41,11 @@ __decorate([
     __metadata("design:type", Date)
 ], Trainee.prototype, "deletedDate", void 0);
 __decorate([
-    (0, typeorm_1.OneToMany)(() => trainingPlan_entity_1.TrainingPlan, (trainingPlan) => trainingPlan.trainee),
+    (0, typeorm_1.OneToMany)(() => training_plan_entity_1.TrainingPlan, (trainingPlan) => trainingPlan.trainee),
     __metadata("design:type", Array)
 ], Trainee.prototype, "trainingPlan", void 0);
 __decorate([
-    (0, typeorm_1.OneToMany)(() => trainingRecord_entity_1.TrainingRecord, (trainingRecord) => trainingRecord.trainee),
+    (0, typeorm_1.OneToMany)(() => training_record_entity_1.TrainingRecord, (trainingRecord) => trainingRecord.trainee),
     __metadata("design:type", Array)
 ], Trainee.prototype, "trainingRecord", void 0);
 exports.Trainee = Trainee = __decorate([
