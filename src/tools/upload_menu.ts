@@ -13,6 +13,42 @@ const client = new messagingApi.MessagingApiClient(clientConfig);
 
 const blobClient = new messagingApi.MessagingApiBlobClient(clientConfig);
 
+// const richMenu: RichMenuRequest = {
+//     size: {
+//         width: 2500,
+//         height: 843
+//     },
+//     selected: true,
+//     name: "menu",
+//     chatBarText: "選單",
+//     areas: [
+//         {
+//             bounds: {
+//                 x: 0,
+//                 y: 0,
+//                 width: 1250,
+//                 height: 843
+//             },
+//             action: {
+//                 type: "message",
+//                 text: "簽到",
+//             }
+//         },
+//         {
+//             bounds: {
+//                 x: 1251,
+//                 y: 0,
+//                 width: 1250,
+//                 height: 843
+//             },
+//             action: {
+//                 type: "message",
+//                 text: "個人資訊"
+//             }
+//         }
+//     ]
+// };
+
 const richMenu: RichMenuRequest = {
     size: {
         width: 2500,
@@ -31,7 +67,7 @@ const richMenu: RichMenuRequest = {
             },
             action: {
                 type: "message",
-                text: "簽到",
+                text: "查詢",
             }
         },
         {
@@ -43,7 +79,7 @@ const richMenu: RichMenuRequest = {
             },
             action: {
                 type: "message",
-                text: "個人資訊"
+                text: "匯出"
             }
         }
     ]
@@ -54,25 +90,25 @@ const task = async () => {
     for (let index = 0; index < existedMenu['aliases'].length; index++) {
         const menu = existedMenu['aliases'][index];
         console.log(`existed = ${JSON.stringify(menu)}`);
-        await client.deleteRichMenuAlias(menu['richMenuAliasId']);
+        // await client.deleteRichMenuAlias(menu['richMenuAliasId']);
     }
 
     //
-    const filepath = join(__dirname, '../menu.png');
-    const buffer = readFileSync(filepath);
+    // const filepath = join(__dirname, '../../menu_admin.png');
+    // const buffer = readFileSync(filepath);
 
     //
-    const richMenuId = (await client.createRichMenu(richMenu)).richMenuId;
-    await blobClient.setRichMenuImage(richMenuId, new Blob([buffer], { type: 'image/png' }));
+    // const richMenuId = (await client.createRichMenu(richMenu)).richMenuId;
+    // await blobClient.setRichMenuImage(richMenuId, new Blob([buffer], { type: 'image/png' }));
 
     //
-    await client.setDefaultRichMenu(richMenuId);
+    // await client.setDefaultRichMenu(richMenuId);
 
     //
-    await client.createRichMenuAlias({
-        richMenuId: richMenuId,
-        richMenuAliasId: 'menu-alias'
-    });
+    // await client.createRichMenuAlias({
+    //     richMenuId: richMenuId,
+    //     richMenuAliasId: 'menu-admin-alias'
+    // });
 
     console.log('success')
 }

@@ -7,10 +7,10 @@ export class TrainingPlan {
     @PrimaryGeneratedColumn()
     id: number
 
-    @Column({ type: 'simple-enum', enum: PlanType })
+    @Column({ type: 'enum', enum: PlanType, default: PlanType.None })
     planType: PlanType
 
-    @Column()
+    @Column({ default: 0 })
     quota: number
 
     @CreateDateColumn()

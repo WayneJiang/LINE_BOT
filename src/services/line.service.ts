@@ -7,6 +7,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Trainee } from 'src/entities/trainee.entity';
 import { Repository } from 'typeorm';
 import { TrainingRecord } from 'src/entities/training-record.entity';
+import { TraineeType } from 'src/enums/enum-constant';
 
 @Injectable()
 export class LineService {
@@ -52,56 +53,91 @@ export class LineService {
                                 body: {
                                     type: 'box',
                                     layout: 'vertical',
-                                    spacing: 'md',
                                     contents: [
                                         {
                                             type: 'text',
-                                            text: `簽到`,
-                                            weight: 'bold'
+                                            text: '確認簽到？',
+                                            weight: 'bold',
+                                            size: 'xl',
+                                            align: 'center',
+                                            gravity: 'center'
                                         },
-                                        { type: 'separator' },
                                         {
-                                            type: 'text',
+                                            type: 'separator',
+                                            margin: 'md'
+                                        },
+                                        {
+                                            type: 'box',
+                                            layout: 'vertical',
+                                            margin: 'lg',
+                                            spacing: 'sm',
                                             contents: [
                                                 {
-                                                    type: 'span',
-                                                    text: `現在時間\n`
+                                                    type: 'text',
+                                                    text: '現在時間：'
                                                 },
                                                 {
-                                                    type: 'span',
-                                                    text: `${now.format('YYYY/MM/DD HH:mm:ss')}\n\n`,
+                                                    type: 'text',
+                                                    text: now.format('YYYY/MM/DD HH:mm:ss'),
                                                     weight: 'bold',
-                                                },
-                                                {
-                                                    type: 'span',
-                                                    text: '要進行簽到嗎？',
-                                                    color: '#ff0000',
-                                                    weight: 'bold',
-                                                    size: 'lg'
+                                                    align: 'center',
+                                                    gravity: 'center',
+                                                    size: 'lg',
+                                                    color: '#0547c3',
+                                                    margin: 'md'
                                                 }
-                                            ],
-                                            wrap: true
-                                        },
+                                            ]
+                                        }
+                                    ]
+                                },
+                                footer: {
+                                    type: 'box',
+                                    layout: 'vertical',
+                                    spacing: 'sm',
+                                    contents: [
                                         {
                                             type: 'button',
                                             style: 'primary',
-                                            action:
-                                            {
-                                                label: '確認',
+                                            height: 'sm',
+                                            color: '#ff7e47',
+                                            action: {
                                                 type: 'postback',
-                                                data: 'action=confirm'
+                                                label: '確認',
+                                                data: 'confirm'
                                             }
                                         },
                                         {
                                             type: 'button',
                                             style: 'secondary',
+                                            height: 'sm',
+                                            color: '#dddddd',
                                             action: {
-                                                label: '取消',
                                                 type: 'postback',
-                                                data: 'action=cancel'
+                                                label: '取消',
+                                                data: 'cancel'
                                             }
+                                        },
+                                        {
+                                            type: 'text',
+                                            text: '回報問題',
+                                            margin: 'xl',
+                                            size: 'xxs',
+                                            align: 'center',
+                                            action: {
+                                                type: 'postback',
+                                                label: '回報問題',
+                                                data: 'report'
+                                            },
+                                            color: '#982121'
                                         }
-                                    ]
+                                    ],
+                                    flex: 0
+                                },
+                                styles: {
+                                    header: {
+                                        separator: true,
+                                        backgroundColor: '#0000ff'
+                                    }
                                 }
                             }
                         }
@@ -250,7 +286,6 @@ export class LineService {
                             }
                             ]
                     });
-
                 break;
         };
 
@@ -276,24 +311,147 @@ export class LineService {
         const profile = await this.messagingApiClient.getProfile(event.source?.userId || '');
         console.log(JSON.stringify(profile));
 
-        if (data == 'action=confirm') {
-            const trainee = await this.traineeRepository.findOne({ where: { socialId: profile.userId } });
-
-            await this.trainingRecordRepository.save(
-                this.trainingRecordRepository.create({
-                    trainee: trainee
-                })
-            );
-
-            this.messagingApiClient.replyMessage({
-                replyToken: replyToken,
-                messages: [
-                    {
-                        type: 'text',
-                        text: '簽到完成'
+        switch (data) {
+            case 'confirm':
+                const trainee = await this.traineeRepository.findOne({
+                    where: {
+                        socialId: profile.userId,
+                        traineeType: TraineeType.Trainee
                     }
-                ]
-            });
-        };
+                });
+
+                if (trainee) {
+                    await this.trainingRecordRepository.save(
+                        this.trainingRecordRepository.create({
+                            trainee: trainee
+                        })
+                    );
+
+                    await this.messagingApiClient.replyMessage({
+                        replyToken: replyToken,
+                        messages: [
+                            {
+                                type: 'flex',
+                                altText: '簽到完成',
+                                contents: {
+                                    type: 'bubble',
+                                    body: {
+                                        type: 'box',
+                                        layout: 'vertical',
+                                        contents: [
+                                            {
+                                                type: 'text',
+                                                text: '簽到完成',
+                                                weight: 'bold',
+                                                size: 'lg',
+                                                align: 'center',
+                                                gravity: 'center'
+                                            },
+                                            {
+                                                type: 'separator',
+                                                margin: 'md'
+                                            },
+                                            {
+                                                type: 'box',
+                                                layout: 'vertical',
+                                                margin: 'lg',
+                                                spacing: 'sm',
+                                                contents: [
+                                                    {
+                                                        type: 'text',
+                                                        text: '簽到時間：'
+                                                    },
+                                                    {
+                                                        type: 'text',
+                                                        text: '2025/03/30 23:30:00',
+                                                        weight: 'bold',
+                                                        align: 'center',
+                                                        gravity: 'center',
+                                                        size: 'xl',
+                                                        color: '#f35541',
+                                                        margin: 'md'
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    }
+                                }
+                            }
+                        ]
+                    });
+                } else {
+                    await this.traineeRepository.upsert(
+                        this.traineeRepository.create({
+                            socialId: profile.userId,
+                            name: profile.displayName
+                        }),
+                        {
+                            conflictPaths: ['socialId'],
+                            upsertType: 'on-conflict-do-update'
+                        }
+                    );
+
+                    await this.messagingApiClient.replyMessage({
+                        replyToken: replyToken,
+                        messages: [
+                            {
+                                type: 'flex',
+                                altText: '簽到失敗',
+                                contents: {
+                                    type: 'bubble',
+                                    body: {
+                                        type: 'box',
+                                        layout: 'vertical',
+                                        contents: [
+                                            {
+                                                type: 'text',
+                                                text: '簽到失敗',
+                                                weight: 'bold',
+                                                size: 'lg',
+                                                align: 'center',
+                                                gravity: 'center'
+                                            },
+                                            {
+                                                type: 'separator',
+                                                margin: 'md'
+                                            },
+                                            {
+                                                type: 'box',
+                                                layout: 'vertical',
+                                                margin: 'lg',
+                                                spacing: 'sm',
+                                                contents: [
+                                                    {
+                                                        type: 'text',
+                                                        text: '找不到資料',
+                                                        weight: 'bold',
+                                                        align: 'center',
+                                                        gravity: 'center',
+                                                        size: 'xl',
+                                                        color: '#cd2828',
+                                                        margin: 'md'
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    }
+                                }
+                            }
+                        ]
+                    });
+                }
+                break;
+            case 'report':
+                await this.messagingApiClient.replyMessage({
+                    replyToken: replyToken,
+                    messages: [
+                        {
+                            type: 'text',
+                            text: '已回報'
+                        }
+                    ]
+                });
+                break;
+        }
     }
 } 
