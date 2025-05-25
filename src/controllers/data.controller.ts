@@ -1,11 +1,11 @@
 import { Body, Controller, Get, Param, Patch, Post } from "@nestjs/common";
-import { IdDto } from "src/dto/id.dto";
-import { TraineeDto } from "src/dto/trainee.dto";
-import { SocialIdDto } from "src/dto/social-id.dto";
-import { Trainee } from "src/entities/trainee.entity";
-import { DataService } from "src/services/data.service";
-import { Coach } from "src/entities/coach.entity";
-import { TrainingPlanDto } from "src/dto/training-plan.dto";
+import { IdDto } from "../dto/id.dto";
+import { TraineeDto } from "../dto/trainee.dto";
+import { SocialIdDto } from "../dto/social-id.dto";
+import { Trainee } from "../entities/trainee.entity";
+import { DataService } from "../services/data.service";
+import { Coach } from "../entities/coach.entity";
+import { TrainingPlanDto } from "../dto/training-plan.dto";
 
 @Controller()
 export class DataController {
