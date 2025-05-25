@@ -1,38 +1,56 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, DeleteDateColumn, OneToMany, PrimaryColumn, Index, Unique } from "typeorm"
-import { TrainingRecord } from "./training-record.entity"
-import { TrainingPlan } from "./training-plan.entity"
-import { TraineeType } from "../enums/enum-constant"
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  DeleteDateColumn,
+  OneToMany,
+  Unique,
+} from "typeorm";
+import { TrainingRecord } from "./training-record.entity";
+import { TrainingPlan } from "./training-plan.entity";
+import { Gender } from "../enums/enum-constant";
 
-@Entity('Trainee')
-@Unique('unique', ['socialId'])
+@Entity("Trainee")
+@Unique("unique_trainee", ["socialId"])
 export class Trainee {
-    @PrimaryGeneratedColumn()
-    id: number
+  @PrimaryGeneratedColumn()
+  id: number;
 
-    @Column()
-    socialId: string
+  @Column()
+  socialId: string;
 
-    @Column()
-    name: string
+  @Column()
+  name: string;
 
-    @Column({ default: '' })
-    phone: string
+  @Column({ type: "enum", enum: Gender, default: Gender.Male })
+  gender: Gender;
 
-    @Column({ type: 'enum', enum: TraineeType, default: TraineeType.Undecided })
-    traineeType: TraineeType
+  @Column({ type: "date", default: () => "'infinity'::date" })
+  birthday: Date;
 
-    @CreateDateColumn()
-    createdDate: Date
+  @Column({ default: "" })
+  phone: string;
 
-    @UpdateDateColumn()
-    updatedDate: Date
+  @Column({ type: "decimal", precision: 4, scale: 1, default: 0 })
+  height: number;
 
-    @DeleteDateColumn()
-    deletedDate: Date
+  @Column({ type: "decimal", precision: 4, scale: 1, default: 0 })
+  weight: number;
 
-    @OneToMany(() => TrainingPlan, (trainingPlan) => trainingPlan.trainee)
-    trainingPlan: TrainingPlan[]
+  @CreateDateColumn()
+  createdDate: Date;
 
-    @OneToMany(() => TrainingRecord, (trainingRecord) => trainingRecord.trainee)
-    trainingRecord: TrainingRecord[]
+  @UpdateDateColumn()
+  updatedDate: Date;
+
+  @DeleteDateColumn()
+  deletedDate: Date;
+
+  @OneToMany(() => TrainingPlan, (trainingPlan) => trainingPlan.trainee)
+  trainingPlan: TrainingPlan[];
+
+  @OneToMany(() => TrainingRecord, (trainingRecord) => trainingRecord.trainee)
+  trainingRecord: TrainingRecord[];
 }

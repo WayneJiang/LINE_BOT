@@ -1,28 +1,63 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, DeleteDateColumn, ManyToOne, JoinColumn } from "typeorm"
-import { Trainee } from "./trainee.entity"
-import { PlanType } from "../enums/enum-constant"
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  DeleteDateColumn,
+  ManyToOne,
+  JoinColumn,
+  OneToMany,
+} from "typeorm";
+import { Trainee } from "./trainee.entity";
+import { PlanType } from "../enums/enum-constant";
+import { Coach } from "./coach.entity";
+import { TrainingRecord } from "./training-record.entity";
 
-@Entity('TrainingPlan')
+@Entity("TrainingPlan")
 export class TrainingPlan {
-    @PrimaryGeneratedColumn()
-    id: number
+  @PrimaryGeneratedColumn()
+  id: number;
 
-    @Column({ type: 'enum', enum: PlanType, default: PlanType.None })
-    planType: PlanType
+  @Column({ type: "timestamp", default: () => "'infinity'::timestamp" })
+  planStartedAt: Date;
 
-    @Column({ default: 0 })
-    quota: number
+  @Column({ type: "timestamp", default: () => "'infinity'::timestamp" })
+  planEndedAt: Date;
 
-    @CreateDateColumn()
-    createdDate: Date
+  @Column({ type: "enum", enum: PlanType, default: PlanType.None })
+  planType: PlanType;
 
-    @UpdateDateColumn()
-    updatedDate: Date
+  @Column({ default: 0 })
+  planQuota: number;
 
-    @DeleteDateColumn()
-    deletedDate: Date
+  @Column({ default: 0 })
+  usedQuota: number;
 
-    @ManyToOne(() => Trainee, (trainee) => trainee.trainingPlan)
-    @JoinColumn({ name: 'trainee' })
-    trainee: Trainee
+  @CreateDateColumn()
+  createdDate: Date;
+
+  @UpdateDateColumn()
+  updatedDate: Date;
+
+  @DeleteDateColumn()
+  deletedDate: Date;
+
+  @ManyToOne(() => Trainee, (trainee) => trainee.trainingPlan)
+  @JoinColumn({ name: "trainee" })
+  trainee: Trainee;
+
+  @ManyToOne(() => Coach, (coach) => coach.coachTrainingPlan)
+  @JoinColumn({ name: "coach_training_plan" })
+  coach: Coach;
+
+  @ManyToOne(() => Coach, (coach) => coach.editTrainingPlan)
+  @JoinColumn({ name: "editor_training_plan" })
+  editor: Coach;
+
+  @OneToMany(
+    () => TrainingRecord,
+    (trainingRecord) => trainingRecord.trainingPlan
+  )
+  trainingRecord: TrainingRecord[];
 }

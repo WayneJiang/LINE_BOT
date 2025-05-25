@@ -1,8 +1,6 @@
-export enum TraineeType {
-    Undecided = 'undecided',
-    Admin = 'admin',
-    Coach = 'coach',
-    Trainee = 'trainee'
+export enum Gender {
+    Male = 'male',
+    Female = 'female'
 }
 
 export enum PlanType {

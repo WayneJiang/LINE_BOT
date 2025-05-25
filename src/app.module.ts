@@ -5,11 +5,12 @@ import { LineService } from './services/line.service';
 import { middleware, MiddlewareConfig } from '@line/bot-sdk';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
-import { ServerController } from './controllers/server.controller';
-import ormconfig from '../database/ormconfig';
+import { DataController } from './controllers/data.controller';
 import { Trainee } from './entities/trainee.entity';
 import { TrainingPlan } from './entities/training-plan.entity';
 import { TrainingRecord } from './entities/training-record.entity';
+import { DataService } from './services/data.service';
+import { Coach } from './entities/coach.entity';
 
 @Module({
   imports: [
@@ -30,10 +31,10 @@ import { TrainingRecord } from './entities/training-record.entity';
         ssl: true
       })
     }),
-    TypeOrmModule.forFeature([Trainee, TrainingPlan, TrainingRecord])
+    TypeOrmModule.forFeature([Trainee, Coach, TrainingPlan, TrainingRecord])
   ],
-  controllers: [ServerController, LineController],
-  providers: [LineService]
+  controllers: [LineController, DataController],
+  providers: [LineService, DataService]
 })
 export class AppModule implements NestModule, OnModuleInit {
   constructor(private configService: ConfigService, private dataSource: DataSource) { }
