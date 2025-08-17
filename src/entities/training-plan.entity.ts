@@ -25,6 +25,9 @@ export class TrainingPlan {
   @Column({ type: "timestamp", default: () => "'infinity'::timestamp" })
   planEndedAt: Date;
 
+  @Column({ type: "simple-json" })
+  trainingSlot: string;
+
   @Column({ type: "enum", enum: PlanType, default: PlanType.None })
   planType: PlanType;
 

@@ -53,8 +53,6 @@ export class LineService {
     const now = utc().tz("Asia/Taipei");
     let lineResponse: ReplyMessageResponse;
 
-    console.log(event.source.userId);
-
     switch (event.message.text) {
       case "簽到":
         lineResponse = await this.messagingApiClient.replyMessage({
@@ -263,6 +261,8 @@ export class LineService {
             .andWhere("trainingPlan.planQuota - trainingPlan.usedQuota > 0")
             .orderBy("trainingPlan.id", "ASC")
             .getOne();
+
+          console.log(trainingPlan);
 
           if (trainingPlan) {
             await this.trainingRecordRepository.save(
