@@ -1,6 +1,14 @@
-import { IsEnum, IsNotEmpty, IsNumber, Min } from "class-validator";
+import {
+  IsEnum,
+  IsNotEmpty,
+  IsNumber,
+  Min,
+  IsArray,
+  ValidateNested,
+} from "class-validator";
 import { PlanType } from "src/enums/enum-constant";
 import { Type } from "class-transformer";
+import { TrainingSlotDto } from "./training-slot.dto";
 
 export class TrainingPlanDto {
   @IsEnum(PlanType)
@@ -11,6 +19,11 @@ export class TrainingPlanDto {
   @Min(1)
   @Type(() => Number)
   planQuota: number;
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => TrainingSlotDto)
+  trainingSlot: TrainingSlotDto[];
 
   @IsNumber()
   @Type(() => Number)

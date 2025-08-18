@@ -40,38 +40,51 @@ export class DataService {
   }
 
   async getByCoachId(id: number): Promise<Coach> {
-    return this.coachRepository
-      .createQueryBuilder("coach")
-      .andWhere("coach.id = :id", { id: id })
-      .getOne();
+    return this.coachRepository.findOneBy({ id });
   }
 
   async getByTraineeId(id: number): Promise<Trainee> {
-    return this.traineeRepository
-      .createQueryBuilder("trainee")
-      .leftJoinAndSelect("trainee.trainingPlan", "trainingPlanList")
-      .leftJoinAndSelect("trainingPlanList.coach", "planCoach")
-      .leftJoinAndSelect("trainingPlanList.editor", "editor")
-      .leftJoinAndSelect("trainee.trainingRecord", "trainingRecord")
-      .leftJoinAndSelect("trainingRecord.trainingPlan", "recordTrainingPlan")
-      .leftJoinAndSelect("recordTrainingPlan.coach", "recordCoach")
-      .andWhere("trainee.id = :id", { id: id })
-      .orderBy("trainingRecord.id", "DESC")
-      .getOne();
+    try {
+      return await this.traineeRepository
+        .createQueryBuilder("trainee")
+        .leftJoinAndSelect("trainee.trainingPlan", "trainingPlanList")
+        .leftJoinAndSelect("trainingPlanList.coach", "planCoach")
+        .leftJoinAndSelect("trainingPlanList.editor", "editor")
+        .leftJoinAndSelect("trainee.trainingRecord", "trainingRecord")
+        .leftJoinAndSelect("trainingRecord.trainingPlan", "recordTrainingPlan")
+        .leftJoinAndSelect("recordTrainingPlan.coach", "recordCoach")
+        .leftJoinAndSelect("recordTrainingPlan.trainee", "recordTrainee")
+        .andWhere("trainee.id = :id", { id: id })
+        .orderBy("trainingRecord.id", "DESC")
+        .addOrderBy("trainingPlanList.id", "ASC")
+        .getOne();
+    } catch (error) {
+      console.error("取得 Trainee 時發生錯誤:", error);
+      throw error;
+    }
   }
 
   async getTrainees(): Promise<Trainee[]> {
-    return this.traineeRepository
-      .createQueryBuilder("trainee")
-      .leftJoinAndSelect("trainee.trainingPlan", "trainingPlan")
-      .leftJoinAndSelect("trainingPlan.coach", "coach")
-      .leftJoinAndSelect("trainee.trainingRecord", "trainingRecord")
-      .orderBy("trainee.id", "ASC")
-      .getMany();
+    try {
+      return await this.traineeRepository
+        .createQueryBuilder("trainee")
+        .leftJoinAndSelect("trainee.trainingPlan", "trainingPlan")
+        .leftJoinAndSelect("trainingPlan.coach", "coach")
+        .leftJoinAndSelect("trainee.trainingRecord", "trainingRecord")
+        .orderBy("trainee.id", "ASC")
+        .addOrderBy("trainingPlan.id", "ASC")
+        .addOrderBy("trainingRecord.id", "DESC")
+        .getMany();
+    } catch (error) {
+      console.error("取得 Trainees 時發生錯誤:", error);
+      throw error;
+    }
   }
 
   async getCoaches(): Promise<Coach[]> {
-    return this.coachRepository.find({ order: { id: "ASC" } });
+    return this.coachRepository.find({
+      order: { id: "ASC" },
+    });
   }
 
   async createTrainee(socialId: string, body: TraineeDto): Promise<Boolean> {
@@ -90,7 +103,7 @@ export class DataService {
 
       return true;
     } catch (error) {
-      console.log(error);
+      console.error("建立 Trainee 時發生錯誤:", error);
       return false;
     }
   }
@@ -115,7 +128,7 @@ export class DataService {
 
       return true;
     } catch (error) {
-      console.log(error);
+      console.error("更新 Trainee 時發生錯誤:", error);
       return false;
     }
   }
@@ -139,9 +152,20 @@ export class DataService {
         return false;
       }
 
+      const existingPlan = await this.trainingPlanRepository.findOneBy({
+        trainee: { id: body.trainee },
+      });
+      if (existingPlan) {
+        return false;
+      }
+
       const trainingPlan = this.trainingPlanRepository.create({
         planType: body.planType,
         planQuota: body.planQuota,
+        trainingSlot:
+          body.trainingSlot?.length > 0
+            ? JSON.stringify(body.trainingSlot)
+            : "",
         trainee: trainee,
         coach: coach,
         editor: editor,
@@ -151,7 +175,7 @@ export class DataService {
 
       return true;
     } catch (error) {
-      console.log(error);
+      console.error("建立 TrainingPlan 時發生錯誤:", error);
       return false;
     }
   }
@@ -181,13 +205,17 @@ export class DataService {
       trainingPlan.coach = coach;
       trainingPlan.planType = body.planType;
       trainingPlan.planQuota = body.planQuota;
+      trainingPlan.trainingSlot =
+        body.trainingSlot?.length > 0
+          ? JSON.stringify(body.trainingSlot)
+          : trainingPlan.trainingSlot;
       trainingPlan.editor = editor;
 
       await this.trainingPlanRepository.save(trainingPlan);
 
       return true;
     } catch (error) {
-      console.log(error);
+      console.error("更新 TrainingPlan 時發生錯誤:", error);
       return false;
     }
   }

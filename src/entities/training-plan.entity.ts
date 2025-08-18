@@ -19,13 +19,13 @@ export class TrainingPlan {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ type: "timestamp", default: () => "'infinity'::timestamp" })
+  @Column({ type: "timestamp", nullable: true })
   planStartedAt: Date;
 
-  @Column({ type: "timestamp", default: () => "'infinity'::timestamp" })
+  @Column({ type: "timestamp", nullable: true })
   planEndedAt: Date;
 
-  @Column({ type: "simple-json" })
+  @Column({ type: "text", default: "" })
   trainingSlot: string;
 
   @Column({ type: "enum", enum: PlanType, default: PlanType.None })
