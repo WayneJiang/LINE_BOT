@@ -5,10 +5,11 @@ import {
   Min,
   IsArray,
   ValidateNested,
+  ValidateIf,
 } from "class-validator";
 import { PlanType } from "src/enums/enum-constant";
 import { Type } from "class-transformer";
-import { TrainingSlotDto } from "./training-slot.dto";
+import { TrainingTimeSlotDto } from "./training-time-slot.dto";
 
 export class TrainingPlanDto {
   @IsEnum(PlanType)
@@ -20,10 +21,15 @@ export class TrainingPlanDto {
   @Type(() => Number)
   planQuota: number;
 
+  @ValidateIf(
+    (body) =>
+      body.planType == PlanType.Personal || body.planType == PlanType.Sequential
+  )
   @IsArray()
+  @IsNotEmpty()
   @ValidateNested({ each: true })
-  @Type(() => TrainingSlotDto)
-  trainingSlot: TrainingSlotDto[];
+  @Type(() => TrainingTimeSlotDto)
+  trainingTimeSlot?: TrainingTimeSlotDto[];
 
   @IsNumber()
   @Type(() => Number)

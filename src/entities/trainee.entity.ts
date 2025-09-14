@@ -18,7 +18,7 @@ export class Trainee {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column()
+  @Column({ default: "U810b33c114ceb29a5ac70dbc05ec27c9" })
   socialId: string;
 
   @Column()
@@ -38,6 +38,9 @@ export class Trainee {
 
   @Column({ type: "decimal", precision: 4, scale: 1, default: 0 })
   weight: number;
+
+  @Column({ default: "" })
+  note: string;
 
   @CreateDateColumn()
   createdDate: Date;

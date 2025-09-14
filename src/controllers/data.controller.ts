@@ -1,4 +1,13 @@
-import { Body, Controller, Get, Param, Patch, Post } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+} from "@nestjs/common";
 import { IdDto } from "../dto/id.dto";
 import { TraineeDto } from "../dto/trainee.dto";
 import { SocialIdDto } from "../dto/social-id.dto";
@@ -6,6 +15,11 @@ import { Trainee } from "../entities/trainee.entity";
 import { DataService } from "../services/data.service";
 import { Coach } from "../entities/coach.entity";
 import { TrainingPlanDto } from "../dto/training-plan.dto";
+import { TrainingRecordDto } from "src/dto/training-record.dto";
+import { TrainingRecord } from "src/entities/training-record.entity";
+import { OpeningCourseDto } from "src/dto/opening-sourse.dto";
+import { OpeningCourse } from "src/entities/opening-course.entity";
+import { UpdateTrainingRecordDto } from "src/dto/update-training-record.dto";
 
 @Controller()
 export class DataController {
@@ -57,7 +71,7 @@ export class DataController {
   }
 
   @Patch("trainee/info/:id")
-  async update(
+  async updateTrainee(
     @Param() param: IdDto,
     @Body() body: TraineeDto
   ): Promise<Boolean> {
@@ -75,5 +89,48 @@ export class DataController {
     @Body() body: TrainingPlanDto
   ): Promise<Boolean> {
     return this.dataService.updateTrainingPlan(param.id, body);
+  }
+
+  @Get("trainingRecord")
+  async getTrainingRecord(
+    @Query() param: TrainingRecordDto
+  ): Promise<TrainingRecord[]> {
+    return this.dataService.getTrainingRecords(param);
+  }
+
+  @Patch("trainingRecord/:id")
+  async updateTrainingRecord(
+    @Param() param: IdDto,
+    @Body() body: UpdateTrainingRecordDto
+  ): Promise<Boolean> {
+    return this.dataService.updateTrainingRecord(param.id, body);
+  }
+
+  @Delete("trainingRecord/:id")
+  async deleteTrainingRecord(@Param() param: IdDto): Promise<Boolean> {
+    return this.dataService.deleteTrainingRecord(param.id);
+  }
+
+  @Post("openingCourse")
+  async createOpeningCourse(@Body() body: OpeningCourseDto): Promise<Boolean> {
+    return this.dataService.createOpeningCourse(body);
+  }
+
+  @Get("openingCourses")
+  async getOpeningCourses(): Promise<OpeningCourse[]> {
+    return this.dataService.getOpeningCourse();
+  }
+
+  @Patch("openingCourse/:id")
+  async updateOpeningCourse(
+    @Param() param: IdDto,
+    @Body() body: OpeningCourseDto
+  ): Promise<Boolean> {
+    return this.dataService.updateOpeningCourse(param.id, body);
+  }
+
+  @Delete("openingCourse/:id")
+  async deleteOpeningCourse(@Param() param: IdDto): Promise<Boolean> {
+    return this.dataService.deleteOpeningCourse(param.id);
   }
 }

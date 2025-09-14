@@ -7,9 +7,11 @@ import {
   DeleteDateColumn,
   OneToMany,
   Unique,
-  Double,
+  JoinColumn,
 } from "typeorm";
 import { TrainingPlan } from "./training-plan.entity";
+import { OpeningCourse } from "./opening-course.entity";
+import { TrainingRecord } from "./training-record.entity";
 
 @Entity("Coach")
 @Unique("unique_coach", ["socialId"])
@@ -17,8 +19,9 @@ export class Coach {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column()
+  @Column({ default: "Ud519e05aed38a9bf1820a30313615cfb" })
   socialId: string;
+  //Ud519e05aed38a9bf1820a30313615cfb
 
   @Column()
   name: string;
@@ -33,8 +36,18 @@ export class Coach {
   deletedDate: Date;
 
   @OneToMany(() => TrainingPlan, (trainingPlan) => trainingPlan.coach)
+  @JoinColumn({ name: "coach" })
   coachTrainingPlan: TrainingPlan[];
 
   @OneToMany(() => TrainingPlan, (trainingPlan) => trainingPlan.editor)
+  @JoinColumn({ name: "editor" })
   editTrainingPlan: TrainingPlan[];
+
+  @OneToMany(() => OpeningCourse, (openingCourse) => openingCourse.coach)
+  @JoinColumn({ name: "openingCourse" })
+  openingCourse: OpeningCourse[];
+
+  @OneToMany(() => TrainingRecord, (trainingRecord) => trainingRecord.editor)
+  @JoinColumn({ name: "trainingRecord" })
+  trainingRecord: TrainingRecord[];
 }

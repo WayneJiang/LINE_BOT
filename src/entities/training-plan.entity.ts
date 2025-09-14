@@ -13,6 +13,7 @@ import { Trainee } from "./trainee.entity";
 import { PlanType } from "../enums/enum-constant";
 import { Coach } from "./coach.entity";
 import { TrainingRecord } from "./training-record.entity";
+import { TrainingTimeSlot } from "./training-time-slot.entity";
 
 @Entity("TrainingPlan")
 export class TrainingPlan {
@@ -20,13 +21,10 @@ export class TrainingPlan {
   id: number;
 
   @Column({ type: "timestamp", nullable: true })
-  planStartedAt: Date;
+  start: Date;
 
   @Column({ type: "timestamp", nullable: true })
-  planEndedAt: Date;
-
-  @Column({ type: "text", default: "" })
-  trainingSlot: string;
+  end: Date;
 
   @Column({ type: "enum", enum: PlanType, default: PlanType.None })
   planType: PlanType;
@@ -51,11 +49,11 @@ export class TrainingPlan {
   trainee: Trainee;
 
   @ManyToOne(() => Coach, (coach) => coach.coachTrainingPlan)
-  @JoinColumn({ name: "coach_training_plan" })
+  @JoinColumn({ name: "coach" })
   coach: Coach;
 
   @ManyToOne(() => Coach, (coach) => coach.editTrainingPlan)
-  @JoinColumn({ name: "editor_training_plan" })
+  @JoinColumn({ name: "editor" })
   editor: Coach;
 
   @OneToMany(
@@ -63,4 +61,10 @@ export class TrainingPlan {
     (trainingRecord) => trainingRecord.trainingPlan
   )
   trainingRecord: TrainingRecord[];
+
+  @OneToMany(
+    () => TrainingTimeSlot,
+    (trainingTimeSlot) => trainingTimeSlot.trainingPlan
+  )
+  trainingTimeSlot: TrainingTimeSlot[];
 }

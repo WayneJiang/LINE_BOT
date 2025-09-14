@@ -10,13 +10,15 @@ import {
   MessagingApiClient,
   ReplyMessageResponse,
 } from "@line/bot-sdk/dist/messaging-api/api";
-import { utc } from "moment-timezone";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { TrainingRecord } from "src/entities/training-record.entity";
 import { Trainee } from "src/entities/trainee.entity";
 import { TrainingPlan } from "src/entities/training-plan.entity";
 import dayjs from "dayjs";
+import utc from "dayjs/plugin/utc";
+import timezone from "dayjs/plugin/timezone";
+import { PlanType } from "src/enums/enum-constant";
 
 @Injectable()
 export class LineService {
@@ -47,57 +49,163 @@ export class LineService {
       return;
     }
 
-    console.log("Receive textmessage event");
+    dayjs.extend(utc);
+    dayjs.extend(timezone);
 
     const replyToken = event.replyToken;
-    const now = utc().tz("Asia/Taipei");
+    const now = dayjs().tz("Asia/Taipei");
     let lineResponse: ReplyMessageResponse;
 
     switch (event.message.text) {
       case "簽到":
-        lineResponse = await this.messagingApiClient.replyMessage({
-          replyToken: replyToken,
-          messages: [
-            {
-              type: "flex",
-              altText: "簽到",
-              contents: {
+        const currentHour = now.format("HH:mm");
+        let contents = [];
+
+        const traineeUserId = event.source?.userId;
+        if (traineeUserId) {
+          const trainee = await this.traineeRepository.findOneBy({
+            socialId: traineeUserId,
+          });
+
+          if (trainee) {
+            const personalAndBlockPlans = await this.trainingPlanRepository
+              .createQueryBuilder("trainingPlan")
+              .leftJoinAndSelect("trainingPlan.coach", "coach")
+              .leftJoinAndSelect(
+                "trainingPlan.trainingTimeSlot",
+                "trainingTimeSlot"
+              )
+              .where("trainingPlan.trainee = :traineeId", {
+                traineeId: trainee.id,
+              })
+              .andWhere("trainingPlan.planQuota - trainingPlan.usedQuota > 0")
+              .andWhere("trainingPlan.planType IN (:...planTypes)", {
+                planTypes: [PlanType.Personal, PlanType.Block],
+              })
+              .andWhere("trainingTimeSlot.dayOfWeek = :dayOfWeek", {
+                dayOfWeek: now.format("dddd"),
+              })
+              .andWhere("trainingTimeSlot.start <= :currentHour", {
+                currentHour: currentHour,
+              })
+              .andWhere("trainingTimeSlot.end > :currentHour", {
+                currentHour: currentHour,
+              })
+              .select([
+                'trainingPlan.id AS "id"',
+                'trainingPlan.planType AS "planType"',
+                'coach.name AS "coach"',
+                'trainingPlan.planQuota - trainingPlan.usedQuota AS "remainingQuota"',
+              ])
+              .getRawMany();
+
+            const sequentialPlans = await this.trainingPlanRepository
+              .createQueryBuilder("trainingPlan")
+              .leftJoin(
+                "OpeningCourse",
+                "openingCourse",
+                "openingCourse.dayOfWeek = :dayOfWeek AND openingCourse.start <= :currentHour AND openingCourse.end > :currentHour",
+                {
+                  currentHour: currentHour,
+                  dayOfWeek: now.format("dddd"),
+                }
+              )
+              .leftJoinAndSelect("openingCourse.coach", "coach")
+              .where("trainingPlan.trainee = :traineeId", {
+                traineeId: trainee.id,
+              })
+              .andWhere("trainingPlan.planQuota - trainingPlan.usedQuota > 0")
+              .andWhere("trainingPlan.planType = :planType", {
+                planType: PlanType.Sequential,
+              })
+              .andWhere("openingCourse.id IS NOT NULL")
+              .select([
+                'trainingPlan.id AS "id"',
+                'trainingPlan.planType AS "planType"',
+                'coach.name AS "coach"',
+                'trainingPlan.planQuota - trainingPlan.usedQuota AS "remainingQuota"',
+              ])
+              .getRawMany();
+
+            console.log(sequentialPlans);
+
+            const allAvailablePlans = [
+              ...personalAndBlockPlans,
+              ...sequentialPlans,
+            ];
+
+            allAvailablePlans.forEach((plan) => {
+              contents.push({
                 type: "bubble",
                 body: {
                   type: "box",
+                  spacing: "xxl",
                   layout: "vertical",
                   contents: [
                     {
                       type: "text",
-                      text: "確認簽到？",
                       weight: "bold",
-                      size: "xl",
                       align: "center",
                       gravity: "center",
+                      size: "xl",
+                      color: "#0080FF",
+                      text: this.planTypeToText(plan.planType),
+                      wrap: true,
                     },
                     {
                       type: "separator",
+                      color: "#ADADAD",
                       margin: "md",
                     },
                     {
                       type: "box",
-                      layout: "vertical",
-                      margin: "lg",
-                      spacing: "sm",
+                      layout: "baseline",
                       contents: [
                         {
                           type: "text",
-                          text: "現在時間：",
+                          text: "教練：",
+                          wrap: true,
+                          align: "center",
+                          gravity: "center",
+                          size: "md",
+                          margin: "xl",
+                          flex: 2,
                         },
                         {
                           type: "text",
-                          text: now.format("YYYY/MM/DD HH:mm:ss"),
+                          text: plan.coach,
                           weight: "bold",
-                          align: "center",
                           gravity: "center",
                           size: "lg",
-                          color: "#0547c3",
-                          margin: "md",
+                          color: "#019858",
+                          wrap: true,
+                          flex: 3,
+                        },
+                      ],
+                    },
+                    {
+                      type: "box",
+                      layout: "baseline",
+                      contents: [
+                        {
+                          type: "text",
+                          text: "剩餘：",
+                          wrap: true,
+                          align: "center",
+                          gravity: "center",
+                          size: "md",
+                          margin: "xl",
+                          flex: 2,
+                        },
+                        {
+                          type: "text",
+                          text: `${plan.remainingQuota} 堂`,
+                          weight: "bold",
+                          gravity: "center",
+                          size: "lg",
+                          color: "#019858",
+                          wrap: true,
+                          flex: 3,
                         },
                       ],
                     },
@@ -105,53 +213,35 @@ export class LineService {
                 },
                 footer: {
                   type: "box",
-                  layout: "vertical",
-                  spacing: "sm",
+                  layout: "horizontal",
                   contents: [
                     {
                       type: "button",
                       style: "primary",
-                      height: "sm",
-                      color: "#ff7e47",
+                      height: "md",
+                      color: "#FF2D2D",
                       action: {
                         type: "postback",
-                        label: "確認",
-                        data: "confirm",
+                        label: "簽到",
+                        data: `${plan.id}`,
                       },
-                    },
-                    {
-                      type: "button",
-                      style: "secondary",
-                      height: "sm",
-                      color: "#dddddd",
-                      action: {
-                        type: "postback",
-                        label: "取消",
-                        data: "cancel",
-                      },
-                    },
-                    {
-                      type: "text",
-                      text: "回報問題",
-                      margin: "xl",
-                      size: "xxs",
-                      align: "center",
-                      action: {
-                        type: "postback",
-                        label: "回報問題",
-                        data: "report",
-                      },
-                      color: "#982121",
                     },
                   ],
-                  flex: 0,
                 },
-                styles: {
-                  header: {
-                    separator: true,
-                    backgroundColor: "#0000ff",
-                  },
-                },
+              });
+            });
+          }
+        }
+
+        lineResponse = await this.messagingApiClient.replyMessage({
+          replyToken: replyToken,
+          messages: [
+            {
+              type: "flex",
+              altText: "簽到",
+              contents: {
+                type: "carousel",
+                contents: contents,
               },
             },
           ],
@@ -232,6 +322,9 @@ export class LineService {
       return;
     }
 
+    dayjs.extend(utc);
+    dayjs.extend(timezone);
+
     console.log("Receive postback event");
 
     const replyToken = event.replyToken;
@@ -248,203 +341,197 @@ export class LineService {
     );
     console.log(JSON.stringify(profile));
 
-    switch (data) {
-      case "confirm":
-        const trainee = await this.traineeRepository.findOneBy({
-          socialId: profile.userId,
-        });
+    const planId = data;
 
-        if (trainee) {
-          const trainingPlan = await this.trainingPlanRepository
-            .createQueryBuilder("trainingPlan")
-            .where("trainingPlan.planEndedAt = 'infinity'::timestamp")
-            .andWhere("trainingPlan.planQuota - trainingPlan.usedQuota > 0")
-            .orderBy("trainingPlan.id", "ASC")
-            .getOne();
+    const trainee = await this.traineeRepository.findOneBy({
+      socialId: profile.userId,
+    });
 
-          console.log(trainingPlan);
+    if (trainee) {
+      const trainingPlan = await this.trainingPlanRepository.findOneBy({
+        id: Number(planId),
+      });
 
-          if (trainingPlan) {
-            await this.trainingRecordRepository.save(
-              this.trainingRecordRepository.create({
-                trainee: trainee,
-                trainingPlan: trainingPlan,
-              })
-            );
-
-            if (trainingPlan.planQuota - trainingPlan.usedQuota == 1) {
-              trainingPlan.planEndedAt = dayjs().toDate();
-              trainingPlan.usedQuota = trainingPlan.usedQuota + 1;
-            } else {
-              trainingPlan.planStartedAt = dayjs().toDate();
-              trainingPlan.usedQuota = trainingPlan.usedQuota + 1;
-            }
-            await this.trainingPlanRepository.save(trainingPlan);
-
-            await this.messagingApiClient.replyMessage({
-              replyToken: replyToken,
-              messages: [
-                {
-                  type: "flex",
-                  altText: "簽到完成",
-                  contents: {
-                    type: "bubble",
-                    body: {
-                      type: "box",
-                      layout: "vertical",
-                      contents: [
-                        {
-                          type: "text",
-                          text: "簽到完成",
-                          weight: "bold",
-                          size: "lg",
-                          align: "center",
-                          gravity: "center",
-                        },
-                        {
-                          type: "separator",
-                          margin: "md",
-                        },
-                        {
-                          type: "box",
-                          layout: "vertical",
-                          margin: "lg",
-                          spacing: "sm",
-                          contents: [
-                            {
-                              type: "text",
-                              text: "簽到時間：",
-                            },
-                            {
-                              type: "text",
-                              text: dayjs().format("YYYY/MM/DD HH:mm:ss"),
-                              weight: "bold",
-                              align: "center",
-                              gravity: "center",
-                              size: "xl",
-                              color: "#f35541",
-                              margin: "md",
-                            },
-                          ],
-                        },
-                      ],
-                    },
-                  },
-                },
-              ],
-            });
-          } else {
-            await this.messagingApiClient.replyMessage({
-              replyToken: replyToken,
-              messages: [
-                {
-                  type: "flex",
-                  altText: "簽到失敗",
-                  contents: {
-                    type: "bubble",
-                    body: {
-                      type: "box",
-                      layout: "vertical",
-                      contents: [
-                        {
-                          type: "text",
-                          text: "簽到失敗",
-                          weight: "bold",
-                          size: "lg",
-                          align: "center",
-                          gravity: "center",
-                        },
-                        {
-                          type: "separator",
-                          margin: "md",
-                        },
-                        {
-                          type: "box",
-                          layout: "vertical",
-                          margin: "lg",
-                          spacing: "sm",
-                          contents: [
-                            {
-                              type: "text",
-                              text: "找不到可用的訓練計畫",
-                              weight: "bold",
-                              align: "center",
-                              gravity: "center",
-                              size: "xl",
-                              color: "#cd2828",
-                              margin: "md",
-                            },
-                          ],
-                        },
-                      ],
-                    },
-                  },
-                },
-              ],
-            });
-          }
+      if (trainingPlan) {
+        await this.trainingRecordRepository.save(
+          this.trainingRecordRepository.create({
+            trainee: trainee,
+            trainingPlan: trainingPlan,
+          })
+        );
+        if (trainingPlan.planQuota - trainingPlan.usedQuota == 1) {
+          trainingPlan.end = dayjs().toDate();
+          trainingPlan.usedQuota = trainingPlan.usedQuota + 1;
         } else {
-          await this.messagingApiClient.replyMessage({
-            replyToken: replyToken,
-            messages: [
-              {
-                type: "flex",
-                altText: "簽到失敗",
-                contents: {
-                  type: "bubble",
-                  body: {
-                    type: "box",
-                    layout: "vertical",
-                    contents: [
-                      {
-                        type: "text",
-                        text: "簽到失敗",
-                        weight: "bold",
-                        size: "lg",
-                        align: "center",
-                        gravity: "center",
-                      },
-                      {
-                        type: "separator",
-                        margin: "md",
-                      },
-                      {
-                        type: "box",
-                        layout: "vertical",
-                        margin: "lg",
-                        spacing: "sm",
-                        contents: [
-                          {
-                            type: "text",
-                            text: "找不到你的資料",
-                            weight: "bold",
-                            align: "center",
-                            gravity: "center",
-                            size: "xl",
-                            color: "#cd2828",
-                            margin: "md",
-                          },
-                        ],
-                      },
-                    ],
-                  },
-                },
-              },
-            ],
-          });
+          trainingPlan.start = dayjs().toDate();
+          trainingPlan.usedQuota = trainingPlan.usedQuota + 1;
         }
-        break;
-      case "report":
+        await this.trainingPlanRepository.save(trainingPlan);
+
         await this.messagingApiClient.replyMessage({
           replyToken: replyToken,
           messages: [
             {
-              type: "text",
-              text: "已回報",
+              type: "flex",
+              altText: "簽到完成",
+              contents: {
+                type: "bubble",
+                body: {
+                  type: "box",
+                  layout: "vertical",
+                  contents: [
+                    {
+                      type: "text",
+                      text: "簽到完成",
+                      weight: "bold",
+                      size: "lg",
+                      align: "center",
+                      gravity: "center",
+                    },
+                    {
+                      type: "separator",
+                      margin: "md",
+                    },
+                    {
+                      type: "box",
+                      layout: "vertical",
+                      margin: "lg",
+                      spacing: "sm",
+                      contents: [
+                        {
+                          type: "text",
+                          text: "簽到時間：",
+                        },
+                        {
+                          type: "text",
+                          text: dayjs()
+                            .tz("Asia/Taipei")
+                            .format("YYYY/MM/DD HH:mm:ss"),
+                          weight: "bold",
+                          align: "center",
+                          gravity: "center",
+                          size: "xl",
+                          color: "#f35541",
+                          margin: "md",
+                        },
+                      ],
+                    },
+                  ],
+                },
+              },
             },
           ],
         });
-        break;
+      } else {
+        await this.messagingApiClient.replyMessage({
+          replyToken: replyToken,
+          messages: [
+            {
+              type: "flex",
+              altText: "簽到失敗",
+              contents: {
+                type: "bubble",
+                body: {
+                  type: "box",
+                  layout: "vertical",
+                  contents: [
+                    {
+                      type: "text",
+                      text: "簽到失敗",
+                      weight: "bold",
+                      size: "lg",
+                      align: "center",
+                      gravity: "center",
+                    },
+                    {
+                      type: "separator",
+                      margin: "md",
+                    },
+                    {
+                      type: "box",
+                      layout: "vertical",
+                      margin: "lg",
+                      spacing: "sm",
+                      contents: [
+                        {
+                          type: "text",
+                          text: "找不到可用的訓練計畫",
+                          weight: "bold",
+                          align: "center",
+                          gravity: "center",
+                          size: "xl",
+                          color: "#cd2828",
+                          margin: "md",
+                        },
+                      ],
+                    },
+                  ],
+                },
+              },
+            },
+          ],
+        });
+      }
+    } else {
+      await this.messagingApiClient.replyMessage({
+        replyToken: replyToken,
+        messages: [
+          {
+            type: "flex",
+            altText: "簽到失敗",
+            contents: {
+              type: "bubble",
+              body: {
+                type: "box",
+                layout: "vertical",
+                contents: [
+                  {
+                    type: "text",
+                    text: "簽到失敗",
+                    weight: "bold",
+                    size: "lg",
+                    align: "center",
+                    gravity: "center",
+                  },
+                  {
+                    type: "separator",
+                    margin: "md",
+                  },
+                  {
+                    type: "box",
+                    layout: "vertical",
+                    margin: "lg",
+                    spacing: "sm",
+                    contents: [
+                      {
+                        type: "text",
+                        text: "找不到你的資料",
+                        weight: "bold",
+                        align: "center",
+                        gravity: "center",
+                        size: "xl",
+                        color: "#cd2828",
+                        margin: "md",
+                      },
+                    ],
+                  },
+                ],
+              },
+            },
+          },
+        ],
+      });
+    }
+  }
+
+  private planTypeToText(planType: PlanType) {
+    switch (planType) {
+      case PlanType.Personal:
+        return "個人教練";
+      case PlanType.Block:
+        return "團體教練";
+      case PlanType.Sequential:
+        return "開放團體課程";
     }
   }
 }

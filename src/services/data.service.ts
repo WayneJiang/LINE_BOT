@@ -1,11 +1,18 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
+import { OpeningCourseDto } from "src/dto/opening-sourse.dto";
 import { TraineeDto } from "src/dto/trainee.dto";
 import { TrainingPlanDto } from "src/dto/training-plan.dto";
+import { TrainingRecordDto } from "src/dto/training-record.dto";
+import { PlanType } from "src/enums/enum-constant";
 import { Coach } from "src/entities/coach.entity";
+import { OpeningCourse } from "src/entities/opening-course.entity";
 import { Trainee } from "src/entities/trainee.entity";
 import { TrainingPlan } from "src/entities/training-plan.entity";
+import { TrainingRecord } from "src/entities/training-record.entity";
+import { TrainingTimeSlot } from "src/entities/training-time-slot.entity";
 import { Repository } from "typeorm";
+import { UpdateTrainingRecordDto } from "src/dto/update-training-record.dto";
 
 @Injectable()
 export class DataService {
@@ -15,7 +22,13 @@ export class DataService {
     @InjectRepository(Coach)
     private coachRepository: Repository<Coach>,
     @InjectRepository(TrainingPlan)
-    private trainingPlanRepository: Repository<TrainingPlan>
+    private trainingPlanRepository: Repository<TrainingPlan>,
+    @InjectRepository(TrainingRecord)
+    private trainingRecordRepository: Repository<TrainingRecord>,
+    @InjectRepository(TrainingTimeSlot)
+    private trainingTimeSlotRepository: Repository<TrainingTimeSlot>,
+    @InjectRepository(OpeningCourse)
+    private openingCourseRepository: Repository<OpeningCourse>
   ) {}
 
   async getBySocialId(
@@ -44,41 +57,31 @@ export class DataService {
   }
 
   async getByTraineeId(id: number): Promise<Trainee> {
-    try {
-      return await this.traineeRepository
-        .createQueryBuilder("trainee")
-        .leftJoinAndSelect("trainee.trainingPlan", "trainingPlanList")
-        .leftJoinAndSelect("trainingPlanList.coach", "planCoach")
-        .leftJoinAndSelect("trainingPlanList.editor", "editor")
-        .leftJoinAndSelect("trainee.trainingRecord", "trainingRecord")
-        .leftJoinAndSelect("trainingRecord.trainingPlan", "recordTrainingPlan")
-        .leftJoinAndSelect("recordTrainingPlan.coach", "recordCoach")
-        .leftJoinAndSelect("recordTrainingPlan.trainee", "recordTrainee")
-        .andWhere("trainee.id = :id", { id: id })
-        .orderBy("trainingRecord.id", "DESC")
-        .addOrderBy("trainingPlanList.id", "ASC")
-        .getOne();
-    } catch (error) {
-      console.error("取得 Trainee 時發生錯誤:", error);
-      throw error;
-    }
+    return this.traineeRepository
+      .createQueryBuilder("trainee")
+      .leftJoinAndSelect("trainee.trainingPlan", "trainingPlanList")
+      .leftJoinAndSelect(
+        "trainingPlanList.trainingTimeSlot",
+        "trainingTimeSlot"
+      )
+      .leftJoinAndSelect("trainingPlanList.coach", "coach")
+      .leftJoinAndSelect("trainingPlanList.editor", "editor")
+      .andWhere("trainee.id = :id", { id: id })
+      .addOrderBy("trainingPlanList.id", "ASC")
+      .getOne();
   }
 
   async getTrainees(): Promise<Trainee[]> {
-    try {
-      return await this.traineeRepository
-        .createQueryBuilder("trainee")
-        .leftJoinAndSelect("trainee.trainingPlan", "trainingPlan")
-        .leftJoinAndSelect("trainingPlan.coach", "coach")
-        .leftJoinAndSelect("trainee.trainingRecord", "trainingRecord")
-        .orderBy("trainee.id", "ASC")
-        .addOrderBy("trainingPlan.id", "ASC")
-        .addOrderBy("trainingRecord.id", "DESC")
-        .getMany();
-    } catch (error) {
-      console.error("取得 Trainees 時發生錯誤:", error);
-      throw error;
-    }
+    return this.traineeRepository
+      .createQueryBuilder("trainee")
+      .leftJoinAndSelect("trainee.trainingPlan", "trainingPlan")
+      .leftJoinAndSelect("trainingPlan.trainingTimeSlot", "trainingTimeSlot")
+      .leftJoinAndSelect("trainingPlan.coach", "coach")
+      .leftJoinAndSelect("trainee.trainingRecord", "trainingRecord")
+      .orderBy("trainee.id", "ASC")
+      .addOrderBy("trainingPlan.id", "ASC")
+      .addOrderBy("trainingRecord.id", "DESC")
+      .getMany();
   }
 
   async getCoaches(): Promise<Coach[]> {
@@ -87,8 +90,18 @@ export class DataService {
     });
   }
 
-  async createTrainee(socialId: string, body: TraineeDto): Promise<Boolean> {
+  async createTrainee(socialId: string, body: TraineeDto): Promise<boolean> {
     try {
+      // 檢查是否已存在相同 socialId 的 Trainee
+      const existingTrainee = await this.traineeRepository.findOne({
+        where: { socialId },
+      });
+
+      if (existingTrainee) {
+        return false;
+      }
+
+      // 建立 Trainee
       const trainee = this.traineeRepository.create({
         socialId: socialId,
         name: body.name,
@@ -100,7 +113,6 @@ export class DataService {
       });
 
       await this.traineeRepository.save(trainee);
-
       return true;
     } catch (error) {
       console.error("建立 Trainee 時發生錯誤:", error);
@@ -108,9 +120,19 @@ export class DataService {
     }
   }
 
-  async updateTrainee(id: number, body: TraineeDto): Promise<Boolean> {
+  async updateTrainee(id: number, body: TraineeDto): Promise<boolean> {
     try {
-      const result = await this.traineeRepository.update(
+      // 驗證 Trainee 是否存在
+      const trainee = await this.traineeRepository.findOne({
+        where: { id },
+      });
+
+      if (!trainee) {
+        return false;
+      }
+
+      // 更新 Trainee 資料
+      await this.traineeRepository.update(
         { id },
         {
           name: body.name,
@@ -122,10 +144,6 @@ export class DataService {
         }
       );
 
-      if (result.affected == 0) {
-        return false;
-      }
-
       return true;
     } catch (error) {
       console.error("更新 Trainee 時發生錯誤:", error);
@@ -133,45 +151,53 @@ export class DataService {
     }
   }
 
-  async createTrainingPlan(body: TrainingPlanDto): Promise<Boolean> {
+  async createTrainingPlan(body: TrainingPlanDto): Promise<boolean> {
     try {
-      const trainee = await this.traineeRepository.findOneBy({
-        id: body.trainee,
-      });
-      if (!trainee) {
+      // 驗證相關實體是否存在
+      const [trainee, coach, editor] = await Promise.all([
+        this.traineeRepository.findOneBy({ id: body.trainee }),
+        body.planType === PlanType.Block
+          ? Promise.resolve(null)
+          : this.coachRepository.findOneBy({ id: body.coach }),
+        this.coachRepository.findOneBy({ id: body.editor }),
+      ]);
+
+      if (!trainee || !editor) {
         return false;
       }
 
-      const coach = await this.coachRepository.findOneBy({ id: body.coach });
-      if (!coach) {
+      // 如果是 Block 類型，coach 不需要驗證
+      if (body.planType !== PlanType.Block && !coach) {
         return false;
       }
 
-      const editor = await this.coachRepository.findOneBy({ id: body.editor });
-      if (!editor) {
-        return false;
-      }
-
-      const existingPlan = await this.trainingPlanRepository.findOneBy({
-        trainee: { id: body.trainee },
-      });
-      if (existingPlan) {
-        return false;
-      }
-
+      // 建立訓練計畫
       const trainingPlan = this.trainingPlanRepository.create({
         planType: body.planType,
         planQuota: body.planQuota,
-        trainingSlot:
-          body.trainingSlot?.length > 0
-            ? JSON.stringify(body.trainingSlot)
-            : "",
         trainee: trainee,
-        coach: coach,
+        coach: body.planType == PlanType.Block ? null : coach,
         editor: editor,
       });
 
-      await this.trainingPlanRepository.save(trainingPlan);
+      // 先儲存訓練計畫以取得 ID
+      const savedTrainingPlan =
+        await this.trainingPlanRepository.save(trainingPlan);
+
+      if (body.trainingTimeSlot && body.trainingTimeSlot.length > 0) {
+        // 建立並儲存訓練時段
+        const trainingTimeSlots = body.trainingTimeSlot.map((timeSlot) =>
+          this.trainingTimeSlotRepository.create({
+            dayOfWeek: timeSlot.dayOfWeek,
+            start: timeSlot.start,
+            end: timeSlot.end,
+            trainingPlan: savedTrainingPlan,
+          })
+        );
+
+        // 儲存所有訓練時段
+        await this.trainingTimeSlotRepository.save(trainingTimeSlots);
+      }
 
       return true;
     } catch (error) {
@@ -183,39 +209,237 @@ export class DataService {
   async updateTrainingPlan(
     id: number,
     body: TrainingPlanDto
-  ): Promise<Boolean> {
+  ): Promise<boolean> {
     try {
-      const trainingPlan = await this.trainingPlanRepository.findOneBy({
-        id: id,
+      // 驗證 TrainingPlan 是否存在
+      const trainingPlan = await this.trainingPlanRepository.findOne({
+        where: { id },
+        relations: ["trainingTimeSlot"],
       });
+
       if (!trainingPlan) {
         return false;
       }
 
+      // 驗證相關實體是否存在
+      const [coach, editor] = await Promise.all([
+        body.planType === PlanType.Block
+          ? Promise.resolve(null)
+          : this.coachRepository.findOne({ where: { id: body.coach } }),
+        this.coachRepository.findOne({ where: { id: body.editor } }),
+      ]);
+
+      if (!editor) {
+        return false;
+      }
+
+      // 如果是 Block 類型，coach 不需要驗證
+      if (body.planType !== PlanType.Block && !coach) {
+        return false;
+      }
+
+      // 更新 TrainingPlan 基本資料
+      await this.trainingPlanRepository.update(
+        { id },
+        {
+          planType: body.planType,
+          planQuota: body.planQuota,
+          coach: body.planType == PlanType.Block ? null : coach,
+          editor: editor,
+        }
+      );
+
+      // 處理訓練時段的更新
+      if (body.trainingTimeSlot && body.trainingTimeSlot.length > 0) {
+        // 刪除現有的訓練時段
+        await this.trainingTimeSlotRepository.delete({
+          trainingPlan: { id },
+        });
+
+        // 建立新的訓練時段
+        const trainingTimeSlots = body.trainingTimeSlot.map((timeSlot) =>
+          this.trainingTimeSlotRepository.create({
+            dayOfWeek: timeSlot.dayOfWeek,
+            start: timeSlot.start,
+            end: timeSlot.end,
+            trainingPlan: trainingPlan,
+          })
+        );
+
+        // 儲存新的訓練時段
+        await this.trainingTimeSlotRepository.save(trainingTimeSlots);
+      }
+
+      return true;
+    } catch (error) {
+      console.error("更新 TrainingPlan 時發生錯誤:", error);
+      return false;
+    }
+  }
+
+  async getTrainingRecords(body: TrainingRecordDto): Promise<TrainingRecord[]> {
+    try {
+      return await this.trainingRecordRepository
+        .createQueryBuilder("trainingRecord")
+        .leftJoinAndSelect("trainingRecord.trainingPlan", "trainingPlan")
+        .leftJoinAndSelect("trainingPlan.coach", "coach")
+        .where("trainingRecord.trainee = :trainee", { trainee: body.trainee })
+        .andWhere(
+          "TO_CHAR(trainingRecord.createdDate, 'YYYY/MM') = :yearMonth",
+          {
+            yearMonth: body.yearMonth,
+          }
+        )
+        .orderBy("trainingRecord.id", "DESC")
+        .getMany();
+    } catch (error) {
+      console.error("查詢 TrainingRecord 時發生錯誤:", error);
+      return [];
+    }
+  }
+
+  async updateTrainingRecord(
+    id: number,
+    body: UpdateTrainingRecordDto
+  ): Promise<boolean> {
+    try {
+      // 驗證 TrainingRecord 是否存在
+      const trainingRecord = await this.trainingRecordRepository.findOne({
+        where: { id },
+      });
+
+      if (!trainingRecord) {
+        return false;
+      }
+
+      // 驗證相關實體是否存在
+      const [trainingPlan, editor] = await Promise.all([
+        this.trainingPlanRepository.findOneBy({ id: body.trainingPlan }),
+        this.coachRepository.findOneBy({ id: body.editor }),
+      ]);
+
+      if (!trainingPlan || !editor) {
+        return false;
+      }
+
+      // 更新訓練紀錄
+      await this.trainingRecordRepository.update(
+        { id },
+        {
+          trainingPlan: trainingPlan,
+          editor: editor,
+          createdDate: body.date,
+        }
+      );
+
+      return true;
+    } catch (error) {
+      console.error("更新 TrainingRecord 時發生錯誤:", error);
+      return false;
+    }
+  }
+
+  async deleteTrainingRecord(id: number): Promise<boolean> {
+    try {
+      await this.trainingRecordRepository.softDelete(id);
+      return true;
+    } catch (error) {
+      console.error("刪除 TrainingRecord 時發生錯誤:", error);
+      return false;
+    }
+  }
+
+  async createOpeningCourse(body: OpeningCourseDto): Promise<boolean> {
+    try {
+      // 驗證教練是否存在
       const coach = await this.coachRepository.findOneBy({ id: body.coach });
       if (!coach) {
         return false;
       }
 
-      const editor = await this.coachRepository.findOneBy({ id: body.editor });
-      if (!editor) {
+      // 檢查同一個教練、同日期、同時間是否已存在
+      const existingCourse = await this.openingCourseRepository.findOne({
+        where: {
+          coach: { id: body.coach },
+          dayOfWeek: body.dayOfWeek,
+          start: body.start,
+          end: body.end,
+        },
+      });
+
+      if (existingCourse) {
         return false;
       }
 
-      trainingPlan.coach = coach;
-      trainingPlan.planType = body.planType;
-      trainingPlan.planQuota = body.planQuota;
-      trainingPlan.trainingSlot =
-        body.trainingSlot?.length > 0
-          ? JSON.stringify(body.trainingSlot)
-          : trainingPlan.trainingSlot;
-      trainingPlan.editor = editor;
-
-      await this.trainingPlanRepository.save(trainingPlan);
-
+      const openingCourse = this.openingCourseRepository.create({
+        name: body.name,
+        dayOfWeek: body.dayOfWeek,
+        start: body.start,
+        end: body.end,
+        note: body.note,
+        coach: coach,
+      });
+      await this.openingCourseRepository.save(openingCourse);
       return true;
     } catch (error) {
-      console.error("更新 TrainingPlan 時發生錯誤:", error);
+      console.error("建立 OpeningCourse 時發生錯誤:", error);
+      return false;
+    }
+  }
+
+  async getOpeningCourse(): Promise<OpeningCourse[]> {
+    try {
+      return this.openingCourseRepository
+        .createQueryBuilder("openingCourse")
+        .leftJoinAndSelect("openingCourse.coach", "coach")
+        .orderBy("openingCourse.id", "ASC")
+        .getMany();
+    } catch (error) {
+      console.error("查詢 OpeningCourse 時發生錯誤:", error);
+      return [];
+    }
+  }
+
+  async updateOpeningCourse(
+    id: number,
+    body: OpeningCourseDto
+  ): Promise<boolean> {
+    try {
+      // 驗證 OpeningCourse 是否存在
+      const openingCourse = await this.openingCourseRepository.findOneBy({
+        id,
+      });
+      if (!openingCourse) {
+        return false;
+      }
+
+      // 驗證教練是否存在
+      const coach = await this.coachRepository.findOneBy({ id: body.coach });
+      if (!coach) {
+        return false;
+      }
+
+      await this.openingCourseRepository.update(id, {
+        name: body.name,
+        dayOfWeek: body.dayOfWeek,
+        start: body.start,
+        end: body.end,
+        note: body.note,
+        coach: coach,
+      });
+      return true;
+    } catch (error) {
+      console.error("更新 OpeningCourse 時發生錯誤:", error);
+      return false;
+    }
+  }
+
+  async deleteOpeningCourse(id: number): Promise<boolean> {
+    try {
+      await this.openingCourseRepository.softDelete(id);
+      return true;
+    } catch (error) {
+      console.error("刪除 OpeningCourse 時發生錯誤:", error);
       return false;
     }
   }
