@@ -18,10 +18,10 @@ import { TrainingPlanDto } from "../dto/training-plan.dto";
 import {
   TrainingRecordDto,
   UpdateTrainingRecordDto,
-} from "src/dto/training-record.dto";
-import { TrainingRecord } from "src/entities/training-record.entity";
-import { OpeningCourseDto } from "src/dto/opening-sourse.dto";
-import { OpeningCourse } from "src/entities/opening-course.entity";
+} from "../dto/training-record.dto";
+import { TrainingRecord } from "../entities/training-record.entity";
+import { OpeningCourseDto } from "../dto/opening-sourse.dto";
+import { OpeningCourse } from "../entities/opening-course.entity";
 
 @Controller()
 export class DataController {
