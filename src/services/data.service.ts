@@ -3,7 +3,10 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { OpeningCourseDto } from "src/dto/opening-sourse.dto";
 import { TraineeDto } from "src/dto/trainee.dto";
 import { TrainingPlanDto } from "src/dto/training-plan.dto";
-import { TrainingRecordDto } from "src/dto/training-record.dto";
+import {
+  TrainingRecordDto,
+  UpdateTrainingRecordDto,
+} from "src/dto/training-record.dto";
 import { PlanType } from "src/enums/enum-constant";
 import { Coach } from "src/entities/coach.entity";
 import { OpeningCourse } from "src/entities/opening-course.entity";
@@ -12,7 +15,6 @@ import { TrainingPlan } from "src/entities/training-plan.entity";
 import { TrainingRecord } from "src/entities/training-record.entity";
 import { TrainingTimeSlot } from "src/entities/training-time-slot.entity";
 import { Repository } from "typeorm";
-import { UpdateTrainingRecordDto } from "src/dto/update-training-record.dto";
 
 @Injectable()
 export class DataService {
