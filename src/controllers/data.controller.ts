@@ -65,7 +65,7 @@ export class DataController {
   }
 
   @Post("trainee/info/:socialId")
-  async postTraineeInfo(
+  async createTraineeInfo(
     @Param() param: SocialIdDto,
     @Body() body: TraineeDto
   ): Promise<Boolean> {

@@ -353,18 +353,99 @@ export class LineService {
       });
 
       if (trainingPlan) {
-        await this.trainingRecordRepository.save(
-          this.trainingRecordRepository.create({
-            trainee: trainee,
-            trainingPlan: trainingPlan,
+        // 檢查當天是否已經有這個 TrainingPlan 的 TrainingRecord
+        const today = dayjs().startOf("day").toDate();
+
+        const existingRecord = await this.trainingRecordRepository
+          .createQueryBuilder("trainingRecord")
+          .leftJoinAndSelect("trainingRecord.trainee", "trainee")
+          .leftJoinAndSelect("trainingRecord.trainingPlan", "trainingPlan")
+          .where("trainee.id = :traineeId", { traineeId: trainee.id })
+          .andWhere("trainingPlan.id = :planId", { planId: trainingPlan.id })
+          .andWhere("DATE(trainingRecord.createdDate) = DATE(:today)", {
+            today,
           })
-        );
-        if (trainingPlan.planQuota - trainingPlan.usedQuota == 1) {
+          .getOne();
+
+        if (existingRecord) {
+          // 如果當天已經有記錄，拒絕簽到
+          await this.messagingApiClient.replyMessage({
+            replyToken: replyToken,
+            messages: [
+              {
+                type: "flex",
+                altText: "簽到失敗",
+                contents: {
+                  type: "bubble",
+                  body: {
+                    type: "box",
+                    layout: "vertical",
+                    contents: [
+                      {
+                        type: "text",
+                        text: "簽到失敗",
+                        weight: "bold",
+                        size: "lg",
+                        align: "center",
+                        gravity: "center",
+                        color: "#ff0000",
+                      },
+                      {
+                        type: "separator",
+                        margin: "md",
+                      },
+                      {
+                        type: "text",
+                        text: "今天已經簽到過此課程",
+                        align: "center",
+                        gravity: "center",
+                        margin: "md",
+                        color: "#666666",
+                      },
+                    ],
+                  },
+                },
+              },
+            ],
+          });
+          return;
+        }
+
+        // 如果 TrainingPlan 的 planType 是 BLOCK，為所有有這個 TrainingPlan 的 Trainee 都新增一筆 TrainingRecord
+        if (trainingPlan.planType === PlanType.Block) {
+          // 查詢所有有這個 TrainingPlan 的 Trainee
+          const traineesWithPlan = await this.traineeRepository
+            .createQueryBuilder("trainee")
+            .leftJoinAndSelect("trainee.trainingPlan", "trainingPlan")
+            .where("trainingPlan.id = :planId", { planId: trainingPlan.id })
+            .getMany();
+
+          // 為所有找到的 Trainee 建立 TrainingRecord
+          for (const traineeWithPlan of traineesWithPlan) {
+            await this.trainingRecordRepository.save(
+              this.trainingRecordRepository.create({
+                trainee: traineeWithPlan,
+                trainingPlan: trainingPlan,
+              })
+            );
+          }
+        } else {
+          // 原有的個人簽到邏輯
+          await this.trainingRecordRepository.save(
+            this.trainingRecordRepository.create({
+              trainee: trainee,
+              trainingPlan: trainingPlan,
+            })
+          );
+        }
+
+        if (
+          trainingPlan.quota - (trainingPlan.trainingRecord?.length || 0) ==
+          1
+        ) {
           trainingPlan.end = dayjs().toDate();
-          trainingPlan.usedQuota = trainingPlan.usedQuota + 1;
         } else {
           trainingPlan.start = dayjs().toDate();
-          trainingPlan.usedQuota = trainingPlan.usedQuota + 1;
         }
         await this.trainingPlanRepository.save(trainingPlan);
 

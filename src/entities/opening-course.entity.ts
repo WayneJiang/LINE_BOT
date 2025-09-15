@@ -6,7 +6,6 @@ import {
   UpdateDateColumn,
   DeleteDateColumn,
   OneToMany,
-  OneToOne,
   JoinColumn,
   ManyToOne,
 } from "typeorm";

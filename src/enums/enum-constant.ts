@@ -1,13 +1,13 @@
 export enum Gender {
-  Male = "male",
-  Female = "female",
+  Male = "Male",
+  Female = "Female",
 }
 
 export enum PlanType {
-  None = "none",
-  Personal = "personal",
-  Block = "block",
-  Sequential = "sequential",
+  None = "None",
+  Personal = "Personal",
+  Block = "Block",
+  Sequential = "Sequential",
 }
 
 export enum DayOfWeek {

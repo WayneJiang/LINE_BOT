@@ -19,7 +19,7 @@ export class TrainingPlanDto {
   @IsNumber()
   @Min(1)
   @Type(() => Number)
-  planQuota: number;
+  quota: number;
 
   @ValidateIf(
     (body) =>

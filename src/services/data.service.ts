@@ -68,6 +68,7 @@ export class DataService {
       )
       .leftJoinAndSelect("trainingPlanList.coach", "coach")
       .leftJoinAndSelect("trainingPlanList.editor", "editor")
+      .leftJoinAndSelect("trainingPlanList.trainingRecord", "trainingRecord")
       .andWhere("trainee.id = :id", { id: id })
       .addOrderBy("trainingPlanList.id", "ASC")
       .getOne();
@@ -79,7 +80,7 @@ export class DataService {
       .leftJoinAndSelect("trainee.trainingPlan", "trainingPlan")
       .leftJoinAndSelect("trainingPlan.trainingTimeSlot", "trainingTimeSlot")
       .leftJoinAndSelect("trainingPlan.coach", "coach")
-      .leftJoinAndSelect("trainee.trainingRecord", "trainingRecord")
+      .leftJoinAndSelect("trainingPlan.trainingRecord", "trainingRecord")
       .orderBy("trainee.id", "ASC")
       .addOrderBy("trainingPlan.id", "ASC")
       .addOrderBy("trainingRecord.id", "DESC")
@@ -143,6 +144,7 @@ export class DataService {
           height: body.height,
           weight: body.weight,
           phone: body.phone,
+          note: body.note,
         }
       );
 
@@ -176,7 +178,7 @@ export class DataService {
       // 建立訓練計畫
       const trainingPlan = this.trainingPlanRepository.create({
         planType: body.planType,
-        planQuota: body.planQuota,
+        quota: body.quota,
         trainee: trainee,
         coach: body.planType == PlanType.Block ? null : coach,
         editor: editor,
@@ -245,7 +247,7 @@ export class DataService {
         { id },
         {
           planType: body.planType,
-          planQuota: body.planQuota,
+          quota: body.quota,
           coach: body.planType == PlanType.Block ? null : coach,
           editor: editor,
         }

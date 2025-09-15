@@ -30,10 +30,7 @@ export class TrainingPlan {
   planType: PlanType;
 
   @Column({ default: 0 })
-  planQuota: number;
-
-  @Column({ default: 0 })
-  usedQuota: number;
+  quota: number;
 
   @CreateDateColumn()
   createdDate: Date;
