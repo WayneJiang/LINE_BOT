@@ -665,9 +665,9 @@ export class LineService {
       case PlanType.Personal:
         return "個人教練";
       case PlanType.Block:
-        return "團體教練";
+        return "團體課程";
       case PlanType.Sequential:
-        return "開放團體課程";
+        return "開放團課";
     }
   }
 }
