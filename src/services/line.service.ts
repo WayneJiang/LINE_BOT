@@ -75,10 +75,14 @@ export class LineService {
                 "trainingPlan.trainingTimeSlot",
                 "trainingTimeSlot"
               )
+              .leftJoin(
+                "TrainingRecord",
+                "trainingRecord",
+                "trainingRecord.trainingPlan = trainingPlan.id"
+              )
               .where("trainingPlan.trainee = :traineeId", {
                 traineeId: trainee.id,
               })
-              .andWhere("trainingPlan.planQuota - trainingPlan.usedQuota > 0")
               .andWhere("trainingPlan.planType IN (:...planTypes)", {
                 planTypes: [PlanType.Personal, PlanType.Block],
               })
@@ -91,11 +95,13 @@ export class LineService {
               .andWhere("trainingTimeSlot.end > :currentHour", {
                 currentHour: currentHour,
               })
+              .groupBy("trainingPlan.id, coach.name")
+              .having("trainingPlan.quota - COUNT(trainingRecord.id) > 0")
               .select([
                 'trainingPlan.id AS "id"',
                 'trainingPlan.planType AS "planType"',
                 'coach.name AS "coach"',
-                'trainingPlan.planQuota - trainingPlan.usedQuota AS "remainingQuota"',
+                'trainingPlan.quota - COUNT(trainingRecord.id) AS "remainingQuota"',
               ])
               .getRawMany();
 
@@ -111,23 +117,27 @@ export class LineService {
                 }
               )
               .leftJoinAndSelect("openingCourse.coach", "coach")
+              .leftJoin(
+                "TrainingRecord",
+                "trainingRecord",
+                "trainingRecord.trainingPlan = trainingPlan.id"
+              )
               .where("trainingPlan.trainee = :traineeId", {
                 traineeId: trainee.id,
               })
-              .andWhere("trainingPlan.planQuota - trainingPlan.usedQuota > 0")
               .andWhere("trainingPlan.planType = :planType", {
                 planType: PlanType.Sequential,
               })
               .andWhere("openingCourse.id IS NOT NULL")
+              .groupBy("trainingPlan.id, coach.name")
+              .having("trainingPlan.quota - COUNT(trainingRecord.id) > 0")
               .select([
                 'trainingPlan.id AS "id"',
                 'trainingPlan.planType AS "planType"',
                 'coach.name AS "coach"',
-                'trainingPlan.planQuota - trainingPlan.usedQuota AS "remainingQuota"',
+                'trainingPlan.quota - COUNT(trainingRecord.id) AS "remainingQuota"',
               ])
               .getRawMany();
-
-            console.log(sequentialPlans);
 
             const allAvailablePlans = [
               ...personalAndBlockPlans,
@@ -348,8 +358,9 @@ export class LineService {
     });
 
     if (trainee) {
-      const trainingPlan = await this.trainingPlanRepository.findOneBy({
-        id: Number(planId),
+      const trainingPlan = await this.trainingPlanRepository.findOne({
+        where: { id: Number(planId) },
+        relations: ["coach", "trainee"],
       });
 
       if (trainingPlan) {
@@ -396,11 +407,10 @@ export class LineService {
                       },
                       {
                         type: "text",
-                        text: "今天已經簽到過此課程",
+                        text: "此課程今天已經簽到",
                         align: "center",
                         gravity: "center",
                         margin: "md",
-                        color: "#666666",
                       },
                     ],
                   },
@@ -411,23 +421,66 @@ export class LineService {
           return;
         }
 
-        // 如果 TrainingPlan 的 planType 是 BLOCK，為所有有這個 TrainingPlan 的 Trainee 都新增一筆 TrainingRecord
+        // 如果 TrainingPlan 的 planType 是 BLOCK，為所有相同時段、相同教練的夥伴都新增一筆 TrainingRecord
         if (trainingPlan.planType === PlanType.Block) {
-          // 查詢所有有這個 TrainingPlan 的 Trainee
-          const traineesWithPlan = await this.traineeRepository
-            .createQueryBuilder("trainee")
-            .leftJoinAndSelect("trainee.trainingPlan", "trainingPlan")
-            .where("trainingPlan.id = :planId", { planId: trainingPlan.id })
+          // 查詢所有相同時段、相同教練的 Block 訓練計畫
+          const currentHour = dayjs().tz("Asia/Taipei").format("HH:mm");
+          const currentDayOfWeek = dayjs().tz("Asia/Taipei").format("dddd");
+
+          const blockTrainingPlans = await this.trainingPlanRepository
+            .createQueryBuilder("trainingPlan")
+            .leftJoinAndSelect("trainingPlan.trainee", "trainee")
+            .leftJoinAndSelect("trainingPlan.coach", "coach")
+            .leftJoinAndSelect(
+              "trainingPlan.trainingTimeSlot",
+              "trainingTimeSlot"
+            )
+            .where("trainingPlan.planType = :planType", {
+              planType: PlanType.Block,
+            })
+            .andWhere("coach.id = :coachId", { coachId: trainingPlan.coach.id })
+            .andWhere("trainingTimeSlot.dayOfWeek = :dayOfWeek", {
+              dayOfWeek: currentDayOfWeek,
+            })
+            .andWhere("trainingTimeSlot.start <= :currentHour", {
+              currentHour: currentHour,
+            })
+            .andWhere("trainingTimeSlot.end > :currentHour", {
+              currentHour: currentHour,
+            })
             .getMany();
 
-          // 為所有找到的 Trainee 建立 TrainingRecord
-          for (const traineeWithPlan of traineesWithPlan) {
-            await this.trainingRecordRepository.save(
-              this.trainingRecordRepository.create({
-                trainee: traineeWithPlan,
-                trainingPlan: trainingPlan,
+          // 為所有找到的 Block 訓練計畫建立 TrainingRecord
+          for (const blockPlan of blockTrainingPlans) {
+            // 確保 trainee 和 coach 都有載入
+            if (!blockPlan.trainee || !blockPlan.coach) {
+              console.log(`跳過訓練計畫 ${blockPlan.id}：缺少必要的關聯資料`);
+              continue;
+            }
+
+            // 檢查該學員當天是否已經簽到過這個訓練計畫
+            const existingRecord = await this.trainingRecordRepository
+              .createQueryBuilder("trainingRecord")
+              .leftJoinAndSelect("trainingRecord.trainee", "trainee")
+              .leftJoinAndSelect("trainingRecord.trainingPlan", "trainingPlan")
+              .where("trainee.id = :traineeId", {
+                traineeId: blockPlan.trainee.id,
               })
-            );
+              .andWhere("trainingPlan.id = :planId", { planId: blockPlan.id })
+              .andWhere("DATE(trainingRecord.createdDate) = DATE(:today)", {
+                today: dayjs().startOf("day").toDate(),
+              })
+              .getOne();
+
+            // 如果該學員當天還沒有簽到過，才建立新的簽到記錄
+            if (!existingRecord) {
+              await this.trainingRecordRepository.save(
+                this.trainingRecordRepository.create({
+                  trainee: blockPlan.trainee,
+                  trainingPlan: blockPlan,
+                })
+              );
+            }
           }
         } else {
           // 原有的個人簽到邏輯
@@ -439,10 +492,12 @@ export class LineService {
           );
         }
 
-        if (
-          trainingPlan.quota - (trainingPlan.trainingRecord?.length || 0) ==
-          1
-        ) {
+        // 計算已使用的 quota
+        const usedQuota = await this.trainingRecordRepository.count({
+          where: { trainingPlan: { id: trainingPlan.id } },
+        });
+
+        if (trainingPlan.quota - usedQuota === 1) {
           trainingPlan.end = dayjs().toDate();
         } else {
           trainingPlan.start = dayjs().toDate();
