@@ -61,10 +61,10 @@ export class LineService {
         const currentHour = now.format("HH:mm");
         let contents = [];
 
-        const traineeUserId = event.source?.userId;
-        if (traineeUserId) {
+        const socialId = event.source?.userId;
+        if (socialId) {
           const trainee = await this.traineeRepository.findOneBy({
-            socialId: traineeUserId,
+            socialId: socialId,
           });
 
           if (trainee) {
@@ -240,22 +240,149 @@ export class LineService {
                 },
               });
             });
+
+            if (contents.length > 0) {
+              lineResponse = await this.messagingApiClient.replyMessage({
+                replyToken: replyToken,
+                messages: [
+                  {
+                    type: "flex",
+                    altText: "簽到",
+                    contents: {
+                      type: "carousel",
+                      contents: contents,
+                    },
+                  },
+                ],
+              });
+            } else {
+              lineResponse = await this.messagingApiClient.replyMessage({
+                replyToken: replyToken,
+                messages: [
+                  {
+                    type: "flex",
+                    altText: "簽到",
+                    contents: {
+                      type: "bubble",
+                      body: {
+                        type: "box",
+                        layout: "vertical",
+                        contents: [
+                          {
+                            type: "text",
+                            text: "查無訓練計畫",
+                            weight: "bold",
+                            color: "#FF2D2D",
+                            size: "xl",
+                          },
+                          {
+                            type: "separator",
+                            color: "#ADADAD",
+                            margin: "md",
+                          },
+                          {
+                            type: "box",
+                            layout: "vertical",
+                            margin: "lg",
+                            spacing: "sm",
+                            contents: [
+                              {
+                                type: "box",
+                                layout: "vertical",
+                                spacing: "sm",
+                                contents: [
+                                  {
+                                    type: "text",
+                                    text: "您這個時段沒有任何訓練計畫",
+                                    size: "md",
+                                  },
+                                  {
+                                    type: "text",
+                                    text: "可洽詢教練安排其他訓練計畫",
+                                    size: "sm",
+                                    color: "#ADADAD",
+                                  },
+                                ],
+                              },
+                            ],
+                          },
+                        ],
+                      },
+                    },
+                  },
+                ],
+              });
+            }
+          } else {
+            lineResponse = await this.messagingApiClient.replyMessage({
+              replyToken: replyToken,
+              messages: [
+                {
+                  type: "flex",
+                  altText: "簽到",
+                  contents: {
+                    type: "bubble",
+                    body: {
+                      type: "box",
+                      layout: "vertical",
+                      contents: [
+                        {
+                          type: "text",
+                          text: "沒有您的資料",
+                          weight: "bold",
+                          color: "#FF2D2D",
+                          size: "xl",
+                        },
+                        {
+                          type: "separator",
+                          color: "#ADADAD",
+                          margin: "md",
+                        },
+                        {
+                          type: "box",
+                          layout: "vertical",
+                          margin: "lg",
+                          spacing: "sm",
+                          contents: [
+                            {
+                              type: "box",
+                              layout: "vertical",
+                              spacing: "sm",
+                              contents: [
+                                {
+                                  type: "text",
+                                  text: "請點擊下方開始建立您的個人資料",
+                                  size: "md",
+                                },
+                              ],
+                            },
+                          ],
+                        },
+                      ],
+                    },
+                    footer: {
+                      type: "box",
+                      layout: "vertical",
+                      spacing: "xl",
+                      contents: [
+                        {
+                          type: "button",
+                          style: "link",
+                          action: {
+                            type: "uri",
+                            label: "開啟",
+                            uri: `https://managment-web.vercel.app/?socialId=${event.source?.userId}`,
+                          },
+                        },
+                      ],
+                    },
+                  },
+                },
+              ],
+            });
           }
         }
 
-        lineResponse = await this.messagingApiClient.replyMessage({
-          replyToken: replyToken,
-          messages: [
-            {
-              type: "flex",
-              altText: "簽到",
-              contents: {
-                type: "carousel",
-                contents: contents,
-              },
-            },
-          ],
-        });
         break;
       case "個人資訊":
         lineResponse = await this.messagingApiClient.replyMessage({
@@ -263,7 +390,7 @@ export class LineService {
           messages: [
             {
               type: "flex",
-              altText: "簽到",
+              altText: "個人資訊",
               contents: {
                 type: "bubble",
                 body: {
@@ -277,26 +404,9 @@ export class LineService {
                       size: "xl",
                     },
                     {
-                      type: "box",
-                      layout: "vertical",
-                      margin: "lg",
-                      spacing: "sm",
-                      contents: [
-                        {
-                          type: "box",
-                          layout: "horizontal",
-                          spacing: "sm",
-                          contents: [
-                            {
-                              type: "text",
-                              text: "點擊打開網頁",
-                              color: "#aaaaaa",
-                              size: "sm",
-                              flex: 1,
-                            },
-                          ],
-                        },
-                      ],
+                      type: "separator",
+                      color: "#ADADAD",
+                      margin: "md",
                     },
                   ],
                 },
@@ -316,6 +426,73 @@ export class LineService {
                       },
                     },
                   ],
+                },
+              },
+            },
+          ],
+        });
+        break;
+      case "查詢":
+        lineResponse = await this.messagingApiClient.replyMessage({
+          replyToken: replyToken,
+          messages: [
+            {
+              type: "flex",
+              altText: "查詢",
+              contents: {
+                type: "bubble",
+                body: {
+                  type: "box",
+                  layout: "vertical",
+                  contents: [
+                    {
+                      type: "text",
+                      text: "查詢所有學員資訊",
+                      weight: "bold",
+                      size: "xl",
+                    },
+                    {
+                      type: "separator",
+                      color: "#ADADAD",
+                      margin: "md",
+                    },
+                  ],
+                },
+                footer: {
+                  type: "box",
+                  layout: "vertical",
+                  spacing: "sm",
+                  contents: [
+                    {
+                      type: "button",
+                      style: "link",
+                      height: "sm",
+                      action: {
+                        type: "uri",
+                        label: "開啟",
+                        uri: `https://managment-web.vercel.app/?socialId=${event.source?.userId}`,
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          ],
+        });
+        break;
+      case "匯出":
+        lineResponse = await this.messagingApiClient.replyMessage({
+          replyToken: replyToken,
+          messages: [
+            {
+              type: "flex",
+              altText: "匯出",
+              contents: {
+                type: "bubble",
+                hero: {
+                  type: "image",
+                  url: "https://i.meee.com.tw/tPKAVXu.png",
+                  size: "full",
                 },
               },
             },
@@ -454,7 +631,6 @@ export class LineService {
           for (const blockPlan of blockTrainingPlans) {
             // 確保 trainee 和 coach 都有載入
             if (!blockPlan.trainee || !blockPlan.coach) {
-              console.log(`跳過訓練計畫 ${blockPlan.id}：缺少必要的關聯資料`);
               continue;
             }
 
