@@ -19,3 +19,9 @@ export enum DayOfWeek {
   Saturday = "Saturday",
   Sunday = "Sunday",
 }
+
+export enum CoachType {
+  Founder = "Founder",
+  Partner = "Partner",
+  Team = "Team"
+}

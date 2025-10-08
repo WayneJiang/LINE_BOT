@@ -12,6 +12,7 @@ import {
 import { TrainingPlan } from "./training-plan.entity";
 import { OpeningCourse } from "./opening-course.entity";
 import { TrainingRecord } from "./training-record.entity";
+import { CoachType } from "../enums/enum-constant";
 
 @Entity("Coach")
 @Unique("unique_coach", ["socialId"])
@@ -25,6 +26,9 @@ export class Coach {
 
   @Column()
   name: string;
+
+  @Column({ type: "enum", enum: CoachType, default: CoachType.Founder })
+  coachType: CoachType;
 
   @CreateDateColumn()
   createdDate: Date;

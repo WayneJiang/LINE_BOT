@@ -16,7 +16,8 @@ import { DataService } from "../services/data.service";
 import { Coach } from "../entities/coach.entity";
 import { TrainingPlanDto } from "../dto/training-plan.dto";
 import {
-  TrainingRecordDto,
+  CreateTrainingRecordDto,
+  GetTrainingRecordDto,
   UpdateTrainingRecordDto,
 } from "../dto/training-record.dto";
 import { TrainingRecord } from "../entities/training-record.entity";
@@ -95,9 +96,16 @@ export class DataController {
 
   @Get("trainingRecord")
   async getTrainingRecord(
-    @Query() param: TrainingRecordDto
+    @Query() param: GetTrainingRecordDto
   ): Promise<TrainingRecord[]> {
     return this.dataService.getTrainingRecords(param);
+  }
+
+  @Post("trainingRecord")
+  async createTrainingRecord(
+    @Body() body: CreateTrainingRecordDto
+  ): Promise<Boolean> {
+    return this.dataService.createTrainingRecord(body);
   }
 
   @Patch("trainingRecord/:id")

@@ -7,7 +7,7 @@ import {
   IsDate,
 } from "class-validator";
 
-export class TrainingRecordDto {
+export class GetTrainingRecordDto {
   @IsNumber()
   @IsNotEmpty()
   @Type(() => Number)
@@ -16,6 +16,29 @@ export class TrainingRecordDto {
   @IsOptional()
   @Matches(/^\d{4}\/\d{2}$/)
   yearMonth?: string;
+}
+
+export class CreateTrainingRecordDto {
+  @IsNumber()
+  @IsNotEmpty()
+  @Type(() => Number)
+  trainee: number;
+
+  @IsDate()
+  @IsNotEmpty()
+  @Type(() => Date)
+  @IsOptional()
+  date: Date;
+
+  @IsNumber()
+  @IsNotEmpty()
+  @Type(() => Number)
+  editor: number;
+
+  @IsNumber()
+  @IsNotEmpty()
+  @Type(() => Number)
+  trainingPlan: number;
 }
 
 export class UpdateTrainingRecordDto {

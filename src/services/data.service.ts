@@ -4,7 +4,8 @@ import { OpeningCourseDto } from "src/dto/opening-sourse.dto";
 import { TraineeDto } from "src/dto/trainee.dto";
 import { TrainingPlanDto } from "src/dto/training-plan.dto";
 import {
-  TrainingRecordDto,
+  CreateTrainingRecordDto,
+  GetTrainingRecordDto,
   UpdateTrainingRecordDto,
 } from "src/dto/training-record.dto";
 import { PlanType } from "src/enums/enum-constant";
@@ -31,7 +32,7 @@ export class DataService {
     private trainingTimeSlotRepository: Repository<TrainingTimeSlot>,
     @InjectRepository(OpeningCourse)
     private openingCourseRepository: Repository<OpeningCourse>
-  ) {}
+  ) { }
 
   async getBySocialId(
     socialId: string
@@ -281,12 +282,15 @@ export class DataService {
     }
   }
 
-  async getTrainingRecords(body: TrainingRecordDto): Promise<TrainingRecord[]> {
+  async getTrainingRecords(
+    body: GetTrainingRecordDto
+  ): Promise<TrainingRecord[]> {
     try {
       return await this.trainingRecordRepository
         .createQueryBuilder("trainingRecord")
         .leftJoinAndSelect("trainingRecord.trainingPlan", "trainingPlan")
         .leftJoinAndSelect("trainingPlan.coach", "coach")
+        .leftJoinAndSelect("trainingRecord.editor", "editor")
         .where("trainingRecord.trainee = :trainee", { trainee: body.trainee })
         .andWhere(
           "TO_CHAR(trainingRecord.createdDate, 'YYYY/MM') = :yearMonth",
@@ -299,6 +303,35 @@ export class DataService {
     } catch (error) {
       console.error("查詢 TrainingRecord 時發生錯誤:", error);
       return [];
+    }
+  }
+
+  async createTrainingRecord(body: CreateTrainingRecordDto): Promise<boolean> {
+    try {
+      // 驗證相關實體是否存在
+      const [trainee, trainingPlan, editor] = await Promise.all([
+        this.traineeRepository.findOneBy({ id: body.trainee }),
+        this.trainingPlanRepository.findOneBy({ id: body.trainingPlan }),
+        this.coachRepository.findOneBy({ id: body.editor }),
+      ]);
+
+      if (!trainee || !trainingPlan || !editor) {
+        return false;
+      }
+
+      // 建立訓練紀錄
+      const trainingRecord = this.trainingRecordRepository.create({
+        trainee: trainee,
+        trainingPlan: trainingPlan,
+        editor: editor,
+        createdDate: body.date || new Date(),
+      });
+
+      await this.trainingRecordRepository.save(trainingRecord);
+      return true;
+    } catch (error) {
+      console.error("建立 TrainingRecord 時發生錯誤:", error);
+      return false;
     }
   }
 
