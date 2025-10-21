@@ -22,7 +22,6 @@ export class Coach {
 
   @Column({ default: "Ud519e05aed38a9bf1820a30313615cfb" })
   socialId: string;
-  //Ud519e05aed38a9bf1820a30313615cfb
 
   @Column()
   name: string;

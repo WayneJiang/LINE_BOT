@@ -8,7 +8,7 @@ import {
   GetTrainingRecordDto,
   UpdateTrainingRecordDto,
 } from "src/dto/training-record.dto";
-import { PlanType } from "src/enums/enum-constant";
+import { CoachType, PlanType } from "src/enums/enum-constant";
 import { Coach } from "src/entities/coach.entity";
 import { OpeningCourse } from "src/entities/opening-course.entity";
 import { Trainee } from "src/entities/trainee.entity";
@@ -16,6 +16,7 @@ import { TrainingPlan } from "src/entities/training-plan.entity";
 import { TrainingRecord } from "src/entities/training-record.entity";
 import { TrainingTimeSlot } from "src/entities/training-time-slot.entity";
 import { Repository } from "typeorm";
+import { CoachDto } from "src/dto/coach.dto";
 
 @Injectable()
 export class DataService {
@@ -86,6 +87,60 @@ export class DataService {
       .addOrderBy("trainingPlan.id", "ASC")
       .addOrderBy("trainingRecord.id", "DESC")
       .getMany();
+  }
+
+  async createCoach(body: CoachDto): Promise<boolean> {
+    try {
+      // 檢查是否已存在相同名字的 Coach
+      const existingCoach = await this.coachRepository.findOne({
+        where: { name: body.name },
+      });
+
+      if (existingCoach) {
+        return false;
+      }
+
+      // 建立 Coach
+      const coach = this.coachRepository.create({
+        socialId: "",
+        name: body.name,
+        coachType: body.coachType
+      });
+
+      await this.coachRepository.save(coach);
+      return true;
+    } catch (error) {
+      console.error("建立 Coach 時發生錯誤:", error);
+      return false;
+    }
+  }
+
+  async updateCoach(id: number, body: CoachDto): Promise<boolean> {
+    try {
+      // 檢查是否已存在相同名字的 Coach
+      const existingCoach = await this.coachRepository.findOne({
+        where: { id },
+      });
+
+      if (!existingCoach) {
+        return false;
+      }
+
+      // 更新 Coach 資料
+      await this.coachRepository.update(
+        { id },
+        {
+          name: body.name,
+          coachType: body.coachType,
+          socialId: body.socialId
+        }
+      );
+
+      return true;
+    } catch (error) {
+      console.error("更新 Coach 時發生錯誤:", error);
+      return false;
+    }
   }
 
   async getCoaches(): Promise<Coach[]> {

@@ -23,10 +23,11 @@ import {
 import { TrainingRecord } from "../entities/training-record.entity";
 import { OpeningCourseDto } from "../dto/opening-sourse.dto";
 import { OpeningCourse } from "../entities/opening-course.entity";
+import { CoachDto } from "src/dto/coach.dto";
 
 @Controller()
 export class DataController {
-  constructor(private readonly dataService: DataService) {}
+  constructor(private readonly dataService: DataService) { }
 
   @Get()
   async healthCheck(): Promise<{ status: number; message: string }> {
@@ -53,6 +54,16 @@ export class DataController {
   @Get("trainee/info/:id")
   async getTraineeInfo(@Param() param: IdDto): Promise<Trainee> {
     return this.dataService.getByTraineeId(param.id);
+  }
+
+  @Post("coach")
+  async createCoach(@Body() body: CoachDto): Promise<Boolean> {
+    return this.dataService.createCoach(body)
+  }
+
+  @Patch("coach/:id")
+  async updateCoach(@Param() param: IdDto, @Body() body: CoachDto): Promise<Boolean> {
+    return this.dataService.updateCoach(param.id, body);
   }
 
   @Get("trainees")
