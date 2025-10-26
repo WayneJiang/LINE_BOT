@@ -23,7 +23,7 @@ import {
 import { TrainingRecord } from "../entities/training-record.entity";
 import { OpeningCourseDto } from "../dto/opening-sourse.dto";
 import { OpeningCourse } from "../entities/opening-course.entity";
-import { CoachDto } from "src/dto/coach.dto";
+import { CoachDto } from "../dto/coach.dto";
 
 @Controller()
 export class DataController {
