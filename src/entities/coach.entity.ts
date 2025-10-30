@@ -15,7 +15,7 @@ import { TrainingRecord } from "./training-record.entity";
 import { CoachType } from "../enums/enum-constant";
 
 @Entity("Coach")
-@Unique("unique_coach", ["socialId"])
+@Unique("unique_coach", ["id", "socialId"])
 export class Coach {
   @PrimaryGeneratedColumn()
   id: number;

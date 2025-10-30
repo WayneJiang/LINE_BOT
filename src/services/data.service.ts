@@ -91,6 +91,7 @@ export class DataService {
 
   async createCoach(body: CoachDto): Promise<boolean> {
     try {
+      console.log(body)
       // 檢查是否已存在相同名字的 Coach
       const existingCoach = await this.coachRepository.findOne({
         where: { name: body.name },
