@@ -108,7 +108,7 @@ export class DataController {
   @Get("trainingRecord")
   async getTrainingRecord(
     @Query() param: GetTrainingRecordDto
-  ): Promise<TrainingRecord[]> {
+  ): Promise<{ data: TrainingRecord[]; totalPages: number; currentPage: number }> {
     return this.dataService.getTrainingRecords(param);
   }
 

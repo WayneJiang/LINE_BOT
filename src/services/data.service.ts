@@ -340,25 +340,44 @@ export class DataService {
 
   async getTrainingRecords(
     body: GetTrainingRecordDto
-  ): Promise<TrainingRecord[]> {
+  ): Promise<{ data: TrainingRecord[]; totalPages: number; currentPage: number }> {
     try {
-      return await this.trainingRecordRepository
+      const pageSize = 30;
+      const page = body.page || 1;
+      const skip = (page - 1) * pageSize;
+
+      const queryBuilder = this.trainingRecordRepository
         .createQueryBuilder("trainingRecord")
         .leftJoinAndSelect("trainingRecord.trainingPlan", "trainingPlan")
         .leftJoinAndSelect("trainingPlan.coach", "coach")
         .leftJoinAndSelect("trainingRecord.editor", "editor")
         .where("trainingRecord.trainee = :trainee", { trainee: body.trainee })
-        .andWhere(
-          "TO_CHAR(trainingRecord.createdDate, 'YYYY/MM') = :yearMonth",
-          {
-            yearMonth: body.yearMonth,
-          }
-        )
-        .orderBy("trainingRecord.id", "DESC")
+        .orderBy("trainingRecord.id", "DESC");
+
+      // 取得總筆數
+      const totalCount = await queryBuilder.getCount();
+
+      // 計算總頁數
+      const totalPages = Math.ceil(totalCount / pageSize);
+
+      // 取得分頁資料
+      const data = await queryBuilder
+        .skip(skip)
+        .take(pageSize)
         .getMany();
+
+      return {
+        data,
+        totalPages,
+        currentPage: page,
+      };
     } catch (error) {
       console.error("查詢 TrainingRecord 時發生錯誤:", error);
-      return [];
+      return {
+        data: [],
+        totalPages: 0,
+        currentPage: 1,
+      };
     }
   }
 

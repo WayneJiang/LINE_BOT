@@ -13,9 +13,10 @@ export class GetTrainingRecordDto {
   @Type(() => Number)
   trainee: number;
 
-  @IsOptional()
-  @Matches(/^\d{4}\/\d{2}$/)
-  yearMonth?: string;
+  @IsNumber()
+  @IsNotEmpty()
+  @Type(() => Number)
+  page: number;
 }
 
 export class CreateTrainingRecordDto {
