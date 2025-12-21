@@ -233,7 +233,7 @@ export class LineService {
                       action: {
                         type: "postback",
                         label: "簽到",
-                        data: `${plan.id}`,
+                        data: `/debut/${plan.id}`,
                       },
                     },
                   ],
@@ -516,7 +516,10 @@ export class LineService {
 
     const replyToken = event.replyToken;
 
-    const data = event.postback.data;
+    const data = event.postback.data.split("/");
+
+    const debut = (data[1] == "debut");
+    const planId = Number(data[2]);
 
     await this.messagingApiClient.showLoadingAnimation({
       chatId: event.source?.userId || "",
@@ -527,8 +530,6 @@ export class LineService {
       event.source?.userId || ""
     );
     console.log(JSON.stringify(profile));
-
-    const planId = data;
 
     const trainee = await this.traineeRepository.findOneBy({
       socialId: profile.userId,
@@ -555,14 +556,13 @@ export class LineService {
           })
           .getOne();
 
-        if (existingRecord) {
-          // 如果當天已經有記錄，拒絕簽到
+        if (existingRecord && debut) {
           await this.messagingApiClient.replyMessage({
             replyToken: replyToken,
             messages: [
               {
                 type: "flex",
-                altText: "簽到失敗",
+                altText: "重複簽到",
                 contents: {
                   type: "bubble",
                   body: {
@@ -571,7 +571,7 @@ export class LineService {
                     contents: [
                       {
                         type: "text",
-                        text: "簽到失敗",
+                        text: "提醒",
                         weight: "bold",
                         size: "lg",
                         align: "center",
@@ -588,6 +588,45 @@ export class LineService {
                         align: "center",
                         gravity: "center",
                         margin: "md",
+                        size: "xs"
+                      },
+                      {
+                        type: "text",
+                        text: "重複簽到會減少額度",
+                        weight: "bold",
+                        align: "center",
+                        gravity: "center",
+                        margin: "md",
+                        size: "lg",
+                        color: "#019858",
+                      }
+                    ],
+                  },
+                  footer: {
+                    type: "box",
+                    layout: "vertical",
+                    spacing: "sm",
+                    contents: [
+                      {
+                        type: "button",
+                        style: "primary",
+                        height: "sm",
+                        color: "#FF2D2D",
+                        action: {
+                          type: "postback",
+                          label: "了解，再簽到一次",
+                          data: `/again/${trainingPlan.id}`,
+                        },
+                      },
+                      {
+                        type: "button",
+                        style: "secondary",
+                        height: "md",
+                        action: {
+                          type: "message",
+                          label: "沒事了",
+                          text: "沒事了"
+                        },
                       },
                     ],
                   },
