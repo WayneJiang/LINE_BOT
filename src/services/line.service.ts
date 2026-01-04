@@ -18,7 +18,7 @@ import { TrainingPlan } from "src/entities/training-plan.entity";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
-import { PlanType } from "src/enums/enum-constant";
+import { DayOfWeek, PlanType } from "src/enums/enum-constant";
 
 @Injectable()
 export class LineService {
@@ -58,7 +58,6 @@ export class LineService {
 
     switch (event.message.text) {
       case "簽到":
-        const currentHour = now.format("HH:mm");
         let contents = [];
 
         const socialId = event.source?.userId;
@@ -86,15 +85,6 @@ export class LineService {
               .andWhere("trainingPlan.planType IN (:...planTypes)", {
                 planTypes: [PlanType.Personal, PlanType.Block],
               })
-              .andWhere("trainingTimeSlot.dayOfWeek = :dayOfWeek", {
-                dayOfWeek: now.format("dddd"),
-              })
-              .andWhere("trainingTimeSlot.start <= :currentHour", {
-                currentHour: currentHour,
-              })
-              .andWhere("trainingTimeSlot.end > :currentHour", {
-                currentHour: currentHour,
-              })
               .groupBy("trainingPlan.id, coach.name")
               .having("trainingPlan.quota - COUNT(trainingRecord.id) > 0")
               .select([
@@ -105,18 +95,21 @@ export class LineService {
               ])
               .getRawMany();
 
+            const dayOfWeekMap = [
+              DayOfWeek.Sunday,
+              DayOfWeek.Monday,
+              DayOfWeek.Tuesday,
+              DayOfWeek.Wednesday,
+              DayOfWeek.Thursday,
+              DayOfWeek.Friday,
+              DayOfWeek.Saturday,
+            ];
+            const today = dayOfWeekMap[new Date().getDay()];
+
             const sequentialPlans = await this.trainingPlanRepository
               .createQueryBuilder("trainingPlan")
-              .leftJoin(
-                "OpeningCourse",
-                "openingCourse",
-                "openingCourse.dayOfWeek = :dayOfWeek AND openingCourse.start <= :currentHour AND openingCourse.end > :currentHour",
-                {
-                  currentHour: currentHour,
-                  dayOfWeek: now.format("dddd"),
-                }
-              )
-              .leftJoinAndSelect("openingCourse.coach", "coach")
+              .leftJoin("OpeningCourse", "openingCourse", "1=1")
+              .leftJoin("Coach", "coach", "openingCourse.coach = coach.id")
               .leftJoin(
                 "TrainingRecord",
                 "trainingRecord",
@@ -128,14 +121,19 @@ export class LineService {
               .andWhere("trainingPlan.planType = :planType", {
                 planType: PlanType.Sequential,
               })
-              .andWhere("openingCourse.id IS NOT NULL")
-              .groupBy("trainingPlan.id, coach.name")
+              .andWhere("openingCourse.dayOfWeek = :today", {
+                today,
+              })
+              .groupBy("trainingPlan.id, openingCourse.id, coach.name, openingCourse.start, openingCourse.end")
               .having("trainingPlan.quota - COUNT(trainingRecord.id) > 0")
               .select([
                 'trainingPlan.id AS "id"',
                 'trainingPlan.planType AS "planType"',
                 'coach.name AS "coach"',
                 'trainingPlan.quota - COUNT(trainingRecord.id) AS "remainingQuota"',
+                'openingCourse.id AS "openingCourseId"',
+                'openingCourse.start AS "start"',
+                'openingCourse.end AS "end"',
               ])
               .getRawMany();
 
@@ -159,7 +157,9 @@ export class LineService {
                       gravity: "center",
                       size: "xl",
                       color: "#0080FF",
-                      text: this.planTypeToText(plan.planType),
+                      text: plan.planType === PlanType.Sequential
+                        ? `${this.planTypeToText(plan.planType)} ${plan.start}~${plan.end}`
+                        : this.planTypeToText(plan.planType),
                       wrap: true,
                     },
                     {
@@ -879,10 +879,10 @@ export class LineService {
     switch (planType) {
       case PlanType.Personal:
         return "個人教練";
-      case PlanType.Block:
-        return "團體課程";
+      // case PlanType.Block:
+      //   return "團體課程";
       case PlanType.Sequential:
-        return "開放團課";
+        return "團體課程";
     }
   }
 }

@@ -18,12 +18,14 @@ export class TraineeDto {
   name: string;
 
   @IsNumber()
+  @IsOptional()
   @Min(100.0)
   @Max(250.0)
   @Type(() => Number)
   height: number;
 
   @IsNumber()
+  @IsOptional()
   @Min(30.0)
   @Max(300.0)
   @Type(() => Number)
@@ -33,6 +35,7 @@ export class TraineeDto {
   gender: Gender;
 
   @IsString()
+  @IsOptional()
   @Matches(/^\d{4}-\d{2}-\d{2}$/)
   birthday: string;
 
