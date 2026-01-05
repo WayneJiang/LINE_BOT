@@ -46,6 +46,6 @@ export class OpeningCourse {
   @JoinColumn({ name: "coach" })
   coach: Coach;
 
-  @OneToMany(() => TrainingRecord, (trainingRecord) => trainingRecord.trainee)
+  @OneToMany(() => TrainingRecord, (trainingRecord) => trainingRecord.openingCourse)
   trainingRecord: TrainingRecord[];
 }

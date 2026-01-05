@@ -10,6 +10,7 @@ import {
 import { Trainee } from "./trainee.entity";
 import { TrainingPlan } from "./training-plan.entity";
 import { Coach } from "./coach.entity";
+import { OpeningCourse } from "./opening-course.entity";
 
 @Entity("TrainingRecord")
 export class TrainingRecord {
@@ -36,4 +37,8 @@ export class TrainingRecord {
   @ManyToOne(() => Coach, (coach) => coach.trainingRecord)
   @JoinColumn({ name: "editor" })
   editor: Coach;
+
+  @ManyToOne(() => OpeningCourse, (openingCourse) => openingCourse.trainingRecord)
+  @JoinColumn({ name: "openingCourse" })
+  openingCourse: OpeningCourse;
 }
