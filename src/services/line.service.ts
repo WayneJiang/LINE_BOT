@@ -15,6 +15,7 @@ import { Repository } from "typeorm";
 import { TrainingRecord } from "src/entities/training-record.entity";
 import { Trainee } from "src/entities/trainee.entity";
 import { TrainingPlan } from "src/entities/training-plan.entity";
+import { OpeningCourse } from "src/entities/opening-course.entity";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
@@ -31,7 +32,9 @@ export class LineService {
     @InjectRepository(TrainingRecord)
     private trainingRecordRepository: Repository<TrainingRecord>,
     @InjectRepository(TrainingPlan)
-    private trainingPlanRepository: Repository<TrainingPlan>
+    private trainingPlanRepository: Repository<TrainingPlan>,
+    @InjectRepository(OpeningCourse)
+    private openingCourseRepository: Repository<OpeningCourse>
   ) {
     const channelAccessToken = this.configService.get<string>(
       "CHANNEL_ACCESS_TOKEN"
@@ -233,7 +236,7 @@ export class LineService {
                       action: {
                         type: "postback",
                         label: "簽到",
-                        data: `/debut/${plan.id}`,
+                        data: `/debut/${plan.id}/${plan.openingCourseId || 0}`,
                       },
                     },
                   ],
@@ -520,6 +523,7 @@ export class LineService {
 
     const debut = (data[1] == "debut");
     const planId = Number(data[2]);
+    const openingCourseId = data[3] ? Number(data[3]) : 0;
 
     await this.messagingApiClient.showLoadingAnimation({
       chatId: event.source?.userId || "",
@@ -542,6 +546,11 @@ export class LineService {
       });
 
       if (trainingPlan) {
+        // 取得 OpeningCourse（如果有的話）
+        const openingCourse = openingCourseId > 0
+          ? await this.openingCourseRepository.findOneBy({ id: openingCourseId })
+          : null;
+
         // 檢查當天是否已經有這個 TrainingPlan 的 TrainingRecord
         const today = dayjs().startOf("day").toDate();
 
@@ -615,7 +624,7 @@ export class LineService {
                         action: {
                           type: "postback",
                           label: "了解，再簽到一次",
-                          data: `/again/${trainingPlan.id}`,
+                          data: `/again/${trainingPlan.id}/${openingCourseId}`,
                         },
                       },
                       {
@@ -703,6 +712,7 @@ export class LineService {
             this.trainingRecordRepository.create({
               trainee: trainee,
               trainingPlan: trainingPlan,
+              openingCourse: openingCourse,
             })
           );
         }
