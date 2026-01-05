@@ -351,6 +351,7 @@ export class DataService {
         .leftJoinAndSelect("trainingPlan.coach", "coach")
         .leftJoinAndSelect("trainingRecord.editor", "editor")
         .leftJoinAndSelect("trainingRecord.openingCourse", "openingCourse")
+        .leftJoinAndSelect("openingCourse.coach", "openingCourseCoach")
         .where("trainingRecord.trainee = :trainee", { trainee: body.trainee })
         .orderBy("trainingRecord.id", "DESC");
 
