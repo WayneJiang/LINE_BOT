@@ -86,7 +86,7 @@ export class LineService {
                 traineeId: trainee.id,
               })
               .andWhere("trainingPlan.planType IN (:...planTypes)", {
-                planTypes: [PlanType.Personal, PlanType.Block],
+                planTypes: [PlanType.Personal, PlanType.FlexiblePersonal, PlanType.Block],
               })
               .groupBy("trainingPlan.id, coach.name")
               .having("trainingPlan.quota - COUNT(trainingRecord.id) > 0")
@@ -889,6 +889,8 @@ export class LineService {
     switch (planType) {
       case PlanType.Personal:
         return "個人教練";
+      case PlanType.FlexiblePersonal:
+        return "個人彈性";
       // case PlanType.Block:
       //   return "團體課程";
       case PlanType.Sequential:
