@@ -73,10 +73,6 @@ export class LineService {
             const personalAndBlockPlans = await this.trainingPlanRepository
               .createQueryBuilder("trainingPlan")
               .leftJoinAndSelect("trainingPlan.coach", "coach")
-              .leftJoinAndSelect(
-                "trainingPlan.trainingTimeSlot",
-                "trainingTimeSlot"
-              )
               .leftJoin(
                 "TrainingRecord",
                 "trainingRecord",
@@ -89,12 +85,12 @@ export class LineService {
                 planTypes: [PlanType.Personal, PlanType.FlexiblePersonal, PlanType.Block],
               })
               .groupBy("trainingPlan.id, coach.name")
-              .having("trainingPlan.quota - COUNT(trainingRecord.id) > 0")
+              .having("trainingPlan.quota - COUNT(DISTINCT trainingRecord.id) > 0")
               .select([
                 'trainingPlan.id AS "id"',
                 'trainingPlan.planType AS "planType"',
                 'coach.name AS "coach"',
-                'trainingPlan.quota - COUNT(trainingRecord.id) AS "remainingQuota"',
+                'trainingPlan.quota - COUNT(DISTINCT trainingRecord.id) AS "remainingQuota"',
               ])
               .getRawMany();
 
