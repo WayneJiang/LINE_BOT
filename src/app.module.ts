@@ -18,6 +18,7 @@ import { TrainingRecord } from "./entities/training-record.entity";
 import { TrainingTimeSlot } from "./entities/training-time-slot.entity";
 import { OpeningCourse } from "./entities/opening-course.entity";
 import { DataService } from "./services/data.service";
+import { PdfService } from "./services/pdf.service";
 import { Coach } from "./entities/coach.entity";
 
 @Module({
@@ -49,7 +50,7 @@ import { Coach } from "./entities/coach.entity";
     ]),
   ],
   controllers: [LineController, DataController],
-  providers: [LineService, DataService],
+  providers: [LineService, DataService, PdfService],
 })
 export class AppModule implements NestModule, OnModuleInit {
   constructor(

@@ -881,6 +881,23 @@ export class LineService {
     }
   }
 
+  async pushFlexMessage(
+    socialId: string,
+    altText: string,
+    flexContents: object
+  ): Promise<void> {
+    await this.messagingApiClient.pushMessage({
+      to: socialId,
+      messages: [
+        {
+          type: "flex",
+          altText,
+          contents: flexContents as any,
+        },
+      ],
+    });
+  }
+
   private planTypeToText(planType: PlanType) {
     switch (planType) {
       case PlanType.Personal:

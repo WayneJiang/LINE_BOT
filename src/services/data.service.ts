@@ -8,7 +8,7 @@ import {
   GetTrainingRecordDto,
   UpdateTrainingRecordDto,
 } from "src/dto/training-record.dto";
-import { CoachType, PlanType } from "src/enums/enum-constant";
+import { PlanType } from "src/enums/enum-constant";
 import { Coach } from "src/entities/coach.entity";
 import { OpeningCourse } from "src/entities/opening-course.entity";
 import { Trainee } from "src/entities/trainee.entity";
@@ -544,6 +544,45 @@ export class DataService {
     } catch (error) {
       console.error("更新 OpeningCourse 時發生錯誤:", error);
       return false;
+    }
+  }
+
+  async getMonthlySummary(): Promise<
+    { coachName: string; traineeName: string; planType: string; month: string; quota: number; checkinCount: number }[]
+  > {
+    try {
+      const results = await this.trainingPlanRepository
+        .createQueryBuilder("trainingPlan")
+        .innerJoin("trainingPlan.coach", "coach")
+        .innerJoin("trainingPlan.trainee", "trainee")
+        .innerJoin("trainingPlan.trainingRecord", "trainingRecord")
+        .where("DATE_TRUNC('month', trainingRecord.createdDate) = DATE_TRUNC('month', CURRENT_DATE - INTERVAL '1 month')")
+        .select("coach.name", "coachName")
+        .addSelect("trainee.name", "traineeName")
+        .addSelect("trainingPlan.planType", "planType")
+        .addSelect("TO_CHAR(DATE_TRUNC('month', trainingRecord.createdDate), 'YYYY-MM')", "month")
+        .addSelect("trainingPlan.quota", "quota")
+        .addSelect("COUNT(trainingRecord.id)", "checkinCount")
+        .groupBy("coach.name")
+        .addGroupBy("trainee.name")
+        .addGroupBy("trainingPlan.planType")
+        .addGroupBy("DATE_TRUNC('month', trainingRecord.createdDate)")
+        .addGroupBy("trainingPlan.quota")
+        .orderBy("coach.name", "ASC")
+        .addOrderBy("trainee.name", "ASC")
+        .getRawMany();
+
+      return results.map((result) => ({
+        coachName: result.coachName,
+        traineeName: result.traineeName,
+        planType: result.planType,
+        month: result.month,
+        quota: Number(result.quota),
+        checkinCount: Number(result.checkinCount),
+      }));
+    } catch (error) {
+      console.error("查詢教練月度簽到摘要時發生錯誤:", error);
+      return [];
     }
   }
 
