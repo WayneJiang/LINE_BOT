@@ -3,7 +3,6 @@ import {
   Controller,
   Delete,
   Get,
-  Headers,
   Param,
   Patch,
   Post,
@@ -175,16 +174,8 @@ export class DataController {
 
   @Get("cron/monthlySummary")
   async cronMonthlySummary(
-    @Headers("authorization") authHeader: string,
     @Res() res: Response
   ): Promise<void> {
-    // 驗證 Vercel Cron Secret
-    const cronSecret = this.configService.get<string>("CRON_SECRET");
-    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-      res.status(401).json({ status: "unauthorized" });
-      return;
-    }
-
     const TARGET_SOCIAL_ID = "U810b33c114ceb29a5ac70dbc05ec27c9";
 
     try {
