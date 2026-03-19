@@ -175,7 +175,7 @@ export class DataController {
   async cronMonthlySummary(
     @Res() res: Response
   ): Promise<void> {
-    const TARGET_SOCIAL_ID = "U810b33c114ceb29a5ac70dbc05ec27c9";
+    const TARGET_SOCIAL_ID = "Ud519e05aed38a9bf1820a30313615cfb";
 
     try {
       // 查詢所有教練上月簽到摘要
@@ -227,14 +227,6 @@ export class DataController {
                 align: "center",
                 color: "#0080FF",
                 weight: "bold",
-              },
-              {
-                type: "text",
-                text: `共 ${rows.length} 筆資料`,
-                size: "sm",
-                margin: "sm",
-                align: "center",
-                color: "#666666",
               },
             ],
           },
