@@ -28,7 +28,7 @@ import { OpeningCourse } from "../entities/opening-course.entity";
 import { CoachDto } from "../dto/coach.dto";
 import { PdfService } from "../services/pdf.service";
 import { LineService } from "../services/line.service";
-import { ConfigService } from "@nestjs/config";
+import { put } from "@vercel/blob";
 
 @Controller()
 export class DataController {
@@ -36,7 +36,6 @@ export class DataController {
     private readonly dataService: DataService,
     private readonly pdfService: PdfService,
     private readonly lineService: LineService,
-    private readonly configService: ConfigService,
   ) { }
 
   @Get()
@@ -189,12 +188,15 @@ export class DataController {
 
       const month = rows[0].month;
 
-      // 產生整份 PDF
+      // 產生整份 PDF 並上傳至 Vercel Blob
       const pdfBuffer = await this.pdfService.generateMonthlySummaryPdf(month, rows);
 
-      // 透過 LINE push message 發送 PDF 下載連結
-      const baseUrl = this.configService.get<string>("BASE_URL") || "";
-      const downloadUrl = `${baseUrl}/monthlySummary/pdf`;
+      const { url: downloadUrl } =
+        await put(
+          `${month}_簽到統計.pdf`,
+          pdfBuffer,
+          { access: "public" },
+        );
 
       await this.lineService.pushFlexMessage(
         TARGET_SOCIAL_ID,
@@ -265,29 +267,4 @@ export class DataController {
     }
   }
 
-  @Get("monthlySummary/pdf")
-  async downloadMonthlySummaryPdf(@Res() res: Response): Promise<void> {
-    try {
-      const rows = await this.dataService.getMonthlySummary();
-
-      if (rows.length === 0) {
-        res.status(404).json({ error: "無上月簽到資料" });
-        return;
-      }
-
-      const month = rows[0].month;
-      const pdfBuffer = await this.pdfService.generateMonthlySummaryPdf(month, rows);
-
-      res.set({
-        "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(`${month}_簽到統計.pdf`)}`,
-        "Content-Length": pdfBuffer.length,
-      });
-
-      res.send(pdfBuffer);
-    } catch (error) {
-      console.error("產生 PDF 時發生錯誤:", error);
-      res.status(500).json({ error: error.message });
-    }
-  }
 }
