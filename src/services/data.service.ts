@@ -548,29 +548,35 @@ export class DataService {
   }
 
   async getMonthlySummary(): Promise<
-    { coachName: string; traineeName: string; planType: string; month: string; quota: number; checkinCount: number }[]
+    { coachName: string; traineeName: string; planType: string; month: string; quota: number; checkinCount: number; checkinDates: string }[]
   > {
     try {
-      const results = await this.trainingPlanRepository
-        .createQueryBuilder("trainingPlan")
-        .innerJoin("trainingPlan.coach", "coach")
-        .innerJoin("trainingPlan.trainee", "trainee")
-        .innerJoin("trainingPlan.trainingRecord", "trainingRecord")
-        .where("DATE_TRUNC('month', trainingRecord.createdDate) = DATE_TRUNC('month', CURRENT_DATE - INTERVAL '1 month')")
-        .select("coach.name", "coachName")
-        .addSelect("trainee.name", "traineeName")
-        .addSelect("trainingPlan.planType", "planType")
-        .addSelect("TO_CHAR(DATE_TRUNC('month', trainingRecord.createdDate), 'YYYY-MM')", "month")
-        .addSelect("trainingPlan.quota", "quota")
-        .addSelect("COUNT(trainingRecord.id)", "checkinCount")
-        .groupBy("coach.name")
-        .addGroupBy("trainee.name")
-        .addGroupBy("trainingPlan.planType")
-        .addGroupBy("DATE_TRUNC('month', trainingRecord.createdDate)")
-        .addGroupBy("trainingPlan.quota")
-        .orderBy("coach.name", "ASC")
-        .addOrderBy("trainee.name", "ASC")
-        .getRawMany();
+      // 查詢個人教練計畫的上月簽到摘要，含簽到日期
+      const results =
+        await this.trainingPlanRepository
+          .createQueryBuilder("trainingPlan")
+          .innerJoin("trainingPlan.coach", "coach")
+          .innerJoin("trainingPlan.trainee", "trainee")
+          .innerJoin("trainingPlan.trainingRecord", "trainingRecord")
+          .where("DATE_TRUNC('month', trainingRecord.createdDate) = DATE_TRUNC('month', CURRENT_DATE - INTERVAL '1 month')")
+          .andWhere("trainingPlan.planType IN (:...planTypes)", {
+            planTypes: [PlanType.Personal, PlanType.FlexiblePersonal],
+          })
+          .select("coach.name", "coachName")
+          .addSelect("trainee.name", "traineeName")
+          .addSelect("trainingPlan.planType", "planType")
+          .addSelect("TO_CHAR(DATE_TRUNC('month', trainingRecord.createdDate), 'YYYY-MM')", "month")
+          .addSelect("trainingPlan.quota", "quota")
+          .addSelect("COUNT(trainingRecord.id)", "checkinCount")
+          .addSelect("STRING_AGG(TO_CHAR(trainingRecord.createdDate, 'MM/DD HH24:MI'), CHR(10) ORDER BY trainingRecord.createdDate)", "checkinDates")
+          .groupBy("coach.name")
+          .addGroupBy("trainee.name")
+          .addGroupBy("trainingPlan.planType")
+          .addGroupBy("DATE_TRUNC('month', trainingRecord.createdDate)")
+          .addGroupBy("trainingPlan.quota")
+          .orderBy("coach.name", "ASC")
+          .addOrderBy("trainee.name", "ASC")
+          .getRawMany();
 
       return results.map((result) => ({
         coachName: result.coachName,
@@ -579,9 +585,60 @@ export class DataService {
         month: result.month,
         quota: Number(result.quota),
         checkinCount: Number(result.checkinCount),
+        checkinDates: result.checkinDates || "",
       }));
     } catch (error) {
       console.error("查詢教練月度簽到摘要時發生錯誤:", error);
+      return [];
+    }
+  }
+
+  async getSequentialMonthlySummary(): Promise<
+    { courseName: string; courseTime: string; coachName: string; month: string; date: string; traineeName: string }[]
+  > {
+    const DAY_OF_WEEK_LABEL: Record<string, string> = {
+      Monday: "週一",
+      Tuesday: "週二",
+      Wednesday: "週三",
+      Thursday: "週四",
+      Friday: "週五",
+      Saturday: "週六",
+      Sunday: "週日",
+    };
+
+    try {
+      const results =
+        await this.trainingRecordRepository
+          .createQueryBuilder("record")
+          .innerJoin("record.trainingPlan", "plan")
+          .innerJoin("record.trainee", "trainee")
+          .innerJoin("record.openingCourse", "course")
+          .innerJoin("course.coach", "coach")
+          .where("DATE_TRUNC('month', record.createdDate) = DATE_TRUNC('month', CURRENT_DATE - INTERVAL '1 month')")
+          .andWhere("plan.planType = :planType", { planType: PlanType.Sequential })
+          .select("course.name", "courseName")
+          .addSelect("course.dayOfWeek", "dayOfWeek")
+          .addSelect("course.start", "courseStart")
+          .addSelect("course.end", "courseEnd")
+          .addSelect("coach.name", "coachName")
+          .addSelect("TO_CHAR(DATE_TRUNC('month', record.createdDate), 'YYYY-MM')", "month")
+          .addSelect("TO_CHAR(record.createdDate, 'MM/DD')", "date")
+          .addSelect("trainee.name", "traineeName")
+          .orderBy("TO_CHAR(record.createdDate, 'MM/DD')", "ASC")
+          .addOrderBy("course.name", "ASC")
+          .addOrderBy("trainee.name", "ASC")
+          .getRawMany();
+
+      return results.map((result) => ({
+        courseName: result.courseName,
+        courseTime: `${DAY_OF_WEEK_LABEL[result.dayOfWeek] || result.dayOfWeek} ${result.courseStart}-${result.courseEnd}`,
+        coachName: result.coachName,
+        month: result.month,
+        date: result.date,
+        traineeName: result.traineeName,
+      }));
+    } catch (error) {
+      console.error("查詢團體課程月度摘要時發生錯誤:", error);
       return [];
     }
   }

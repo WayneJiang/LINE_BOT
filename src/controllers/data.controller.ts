@@ -160,10 +160,42 @@ export class DataController {
   }
 
   @Get("monthlySummary")
-  async getMonthlySummary(): Promise<
-    { coachName: string; traineeName: string; month: string; quota: number; checkinCount: number }[]
-  > {
-    return this.dataService.getMonthlySummary();
+  async getMonthlySummary(
+    @Res() res: Response
+  ): Promise<void> {
+    res.type("html").send(`<!DOCTYPE html><html><body>
+<script>
+  const a1 = document.createElement("a"); a1.href = "/monthlySummary/personal"; a1.click();
+  setTimeout(() => { const a2 = document.createElement("a"); a2.href = "/monthlySummary/sequential"; a2.click(); }, 1000);
+</script>
+</body></html>`);
+  }
+
+  @Get("monthlySummary/personal")
+  async getPersonalSummary(
+    @Res() response: Response
+  ): Promise<void> {
+    try {
+      const rows = await this.dataService.getMonthlySummary();
+
+      if (rows.length === 0) {
+        response.json({ status: "ok", message: "無上月個人教練資料" });
+        return;
+      }
+
+      const month = rows[0].month;
+      const pdfBuffer = await this.pdfService.generateMonthlySummaryPdf(month, rows);
+
+      response.set({
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `attachment; filename="${month}_personal.pdf"; filename*=UTF-8''${encodeURIComponent(`${month}_個人計畫簽到統計.pdf`)}`,
+        "Content-Length": pdfBuffer.length,
+      });
+      response.end(pdfBuffer);
+    } catch (error) {
+      console.error("產生個人計畫 PDF 時發生錯誤:", error);
+      response.status(500).json({ status: "error", message: error.message });
+    }
   }
 
   @Delete("openingCourse/:id")
@@ -173,30 +205,38 @@ export class DataController {
 
   @Get("cron/monthlySummary")
   async cronMonthlySummary(
-    @Res() res: Response
+    @Res() response: Response
   ): Promise<void> {
-    const TARGET_SOCIAL_ID = "Ud519e05aed38a9bf1820a30313615cfb";
+    const TARGET_SOCIAL_ID = "U810b33c114ceb29a5ac70dbc05ec27c9";
 
     try {
-      // 查詢所有教練上月簽到摘要
-      const rows = await this.dataService.getMonthlySummary();
+      // 同時查詢個人教練與團體課程資料
+      const [personalRows, sequentialRows] = await Promise.all([
+        this.dataService.getMonthlySummary(),
+        this.dataService.getSequentialMonthlySummary(),
+      ]);
 
-      if (rows.length === 0) {
-        res.json({ status: "ok", message: "無上月簽到資料" });
+      if (personalRows.length === 0 && sequentialRows.length === 0) {
+        response.json({ status: "ok", message: "無上月簽到資料" });
         return;
       }
 
-      const month = rows[0].month;
+      const month = personalRows[0]?.month || sequentialRows[0]?.month;
 
-      // 產生整份 PDF 並上傳至 Vercel Blob
-      const pdfBuffer = await this.pdfService.generateMonthlySummaryPdf(month, rows);
+      // 產生兩份 PDF 並上傳至 Vercel Blob
+      const uploads: { label: string; url: string }[] = [];
 
-      const { url: downloadUrl } =
-        await put(
-          `${month}_簽到統計.pdf`,
-          pdfBuffer,
-          { access: "public" },
-        );
+      if (personalRows.length > 0) {
+        const personalPdf = await this.pdfService.generateMonthlySummaryPdf(month, personalRows);
+        const { url } = await put(`${month}_個人計畫簽到統計.pdf`, personalPdf, { access: "public" });
+        uploads.push({ label: "個人計畫簽到統計", url });
+      }
+
+      if (sequentialRows.length > 0) {
+        const sequentialPdf = await this.pdfService.generateSequentialSummaryPdf(month, sequentialRows);
+        const { url } = await put(`${month}_團體課程簽到統計.pdf`, sequentialPdf, { access: "public" });
+        uploads.push({ label: "團體課程簽到統計", url });
+      }
 
       await this.lineService.pushFlexMessage(
         TARGET_SOCIAL_ID,
@@ -209,7 +249,7 @@ export class DataController {
             contents: [
               {
                 type: "text",
-                text: "簽到統計",
+                text: "月度簽到統計",
                 weight: "bold",
                 size: "xl",
                 align: "center",
@@ -234,29 +274,54 @@ export class DataController {
             type: "box",
             layout: "vertical",
             spacing: "sm",
-            contents: [
-              {
-                type: "button",
-                style: "primary",
-                height: "sm",
-                color: "#0080FF",
-                action: {
-                  type: "uri",
-                  label: "下載 PDF 報表",
-                  uri: downloadUrl,
-                },
+            contents: uploads.map((item) => ({
+              type: "button",
+              style: "primary",
+              height: "sm",
+              color: "#0080FF",
+              action: {
+                type: "uri",
+                label: `下載${item.label}`,
+                uri: item.url,
               },
-            ],
+            })),
           },
         }
       );
 
-      console.log(`✅ 已發送 ${month} 簽到統計`);
-      res.json({ status: "ok", message: `已發送 ${month} 簽到統計` });
+      const labels = uploads.map((u) => u.label).join("、");
+      console.log(`✅ 已發送 ${month} ${labels}`);
+      response.json({ status: "ok", message: `已發送 ${month} ${labels}` });
     } catch (error) {
       console.error("發送時發生錯誤:", error);
-      res.status(500).json({ status: "error", message: error.message });
+      response.status(500).json({ status: "error", message: error.message });
     }
   }
 
+  @Get("monthlySummary/sequential")
+  async getSequentialSummary(
+    @Res() response: Response
+  ): Promise<void> {
+    try {
+      const rows = await this.dataService.getSequentialMonthlySummary();
+
+      if (rows.length === 0) {
+        response.json({ status: "ok", message: "無上月團體課程資料" });
+        return;
+      }
+
+      const month = rows[0].month;
+      const pdfBuffer = await this.pdfService.generateSequentialSummaryPdf(month, rows);
+
+      response.set({
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `attachment; filename="${month}_sequential_summary.pdf"; filename*=UTF-8''${encodeURIComponent(`${month}_團體課程簽到統計.pdf`)}`,
+        "Content-Length": pdfBuffer.length,
+      });
+      response.end(pdfBuffer);
+    } catch (error) {
+      console.error("產生團體課程 PDF 時發生錯誤:", error);
+      response.status(500).json({ status: "error", message: error.message });
+    }
+  }
 }
