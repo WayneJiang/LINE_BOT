@@ -207,14 +207,15 @@ export class DataController {
   async cronMonthlySummary(
     @Res() response: Response
   ): Promise<void> {
-    const TARGET_SOCIAL_ID = "U810b33c114ceb29a5ac70dbc05ec27c9";
+    const TARGET_SOCIAL_IDS = (process.env.MONTHLY_SUMMARY_TARGET_SOCIAL_ID || "").split(",").filter(Boolean);
 
     try {
       // 同時查詢個人教練與團體課程資料
-      const [personalRows, sequentialRows] = await Promise.all([
-        this.dataService.getMonthlySummary(),
-        this.dataService.getSequentialMonthlySummary(),
-      ]);
+      const [personalRows, sequentialRows] =
+        await Promise.all([
+          this.dataService.getMonthlySummary(),
+          this.dataService.getSequentialMonthlySummary(),
+        ]);
 
       if (personalRows.length === 0 && sequentialRows.length === 0) {
         response.json({ status: "ok", message: "無上月簽到資料" });
@@ -238,58 +239,60 @@ export class DataController {
         uploads.push({ label: "團體課程簽到統計", url });
       }
 
-      await this.lineService.pushFlexMessage(
-        TARGET_SOCIAL_ID,
-        `${month} 簽到統計`,
-        {
-          type: "bubble",
-          body: {
-            type: "box",
-            layout: "vertical",
-            contents: [
-              {
-                type: "text",
-                text: "月度簽到統計",
-                weight: "bold",
-                size: "xl",
-                align: "center",
-              },
-              {
-                type: "separator",
-                color: "#ADADAD",
-                margin: "md",
-              },
-              {
-                type: "text",
-                text: `${month} 月份`,
-                size: "lg",
-                margin: "lg",
-                align: "center",
-                color: "#0080FF",
-                weight: "bold",
-              },
-            ],
-          },
-          footer: {
-            type: "box",
-            layout: "vertical",
-            spacing: "sm",
-            contents: uploads.map((item) => ({
-              type: "button",
-              style: "primary",
-              height: "sm",
+      const flexContent = {
+        type: "bubble",
+        body: {
+          type: "box",
+          layout: "vertical",
+          contents: [
+            {
+              type: "text",
+              text: "月度簽到統計",
+              weight: "bold",
+              size: "xl",
+              align: "center",
+            },
+            {
+              type: "separator",
+              color: "#ADADAD",
+              margin: "md",
+            },
+            {
+              type: "text",
+              text: `${month} 月份`,
+              size: "lg",
+              margin: "lg",
+              align: "center",
               color: "#0080FF",
-              action: {
-                type: "uri",
-                label: `下載${item.label}`,
-                uri: item.url,
-              },
-            })),
-          },
-        }
+              weight: "bold",
+            },
+          ],
+        },
+        footer: {
+          type: "box",
+          layout: "vertical",
+          spacing: "sm",
+          contents: uploads.map((item) => ({
+            type: "button",
+            style: "primary",
+            height: "sm",
+            color: "#0080FF",
+            action: {
+              type: "uri",
+              label: `下載${item.label}`,
+              uri: item.url,
+            },
+          })),
+        },
+      };
+
+      await Promise.all(
+        TARGET_SOCIAL_IDS.map((id) =>
+          this.lineService.pushFlexMessage(id, `${month} 簽到統計`, flexContent)
+        )
       );
 
-      const labels = uploads.map((u) => u.label).join("、");
+      const labels = uploads.map((upload) => upload.label).join("、");
       console.log(`✅ 已發送 ${month} ${labels}`);
       response.json({ status: "ok", message: `已發送 ${month} ${labels}` });
     } catch (error) {
