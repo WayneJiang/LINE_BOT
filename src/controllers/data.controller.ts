@@ -229,13 +229,13 @@ export class DataController {
 
       if (personalRows.length > 0) {
         const personalPdf = await this.pdfService.generateMonthlySummaryPdf(month, personalRows);
-        const { url } = await put(`${month}_個人計畫簽到統計.pdf`, personalPdf, { access: "public" });
+        const { url } = await put(`${month}_個人計畫簽到統計.pdf`, personalPdf, { access: "public", allowOverwrite: true });
         uploads.push({ label: "個人計畫簽到統計", url });
       }
 
       if (sequentialRows.length > 0) {
         const sequentialPdf = await this.pdfService.generateSequentialSummaryPdf(month, sequentialRows);
-        const { url } = await put(`${month}_團體課程簽到統計.pdf`, sequentialPdf, { access: "public" });
+        const { url } = await put(`${month}_團體課程簽到統計.pdf`, sequentialPdf, { access: "public", allowOverwrite: true });
         uploads.push({ label: "團體課程簽到統計", url });
       }
 
