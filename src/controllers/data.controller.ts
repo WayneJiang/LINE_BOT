@@ -295,6 +295,27 @@ export class DataController {
     }
   }
 
+  @Get("regenerateReport")
+  async regenerateReport(@Res() response: Response): Promise<void> {
+    try {
+      const result = await this.dataService.generateMonthlySummaryPdfs();
+
+      if (!result) {
+        response.json({ status: "ok", message: "無上月簽到資料" });
+        return;
+      }
+
+      const { month, uploads } = result;
+      const labels = uploads.map((upload) => upload.label).join("、");
+      response.json({ status: "ok", message: `已產生 ${month} ${labels}`, uploads });
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : JSON.stringify(error);
+      console.error("產生報表時發生錯誤:", message);
+      response.status(500).json({ status: "error", message });
+    }
+  }
+
   @Get("monthlySummary/sequential")
   async getSequentialSummary(@Res() response: Response): Promise<void> {
     try {
