@@ -1,5 +1,6 @@
 {
    "compilerOptions": {
+      "ignoreDeprecations": "6.0",
       "module": "commonjs",
       "declaration": true,
       "removeComments": true,
@@ -13,10 +14,12 @@
       "incremental": true,
       "skipLibCheck": true,
       "strictNullChecks": false,
+      "useUnknownInCatchVariables": false,
       "noImplicitAny": false,
       "strictBindCallApply": false,
       "forceConsistentCasingInFileNames": false,
       "noFallthroughCasesInSwitch": false, 
-      "esModuleInterop": true
+      "esModuleInterop": true,
+      "types": ["node", "jest"]
    }
 }

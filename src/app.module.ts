@@ -29,7 +29,7 @@ import { Coach } from "./entities/coach.entity";
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: async (configService: ConfigService) => ({
+      useFactory: (configService: ConfigService) => ({
         type: "postgres",
         host: configService.get<string>("POSTGRES_HOST"),
         port: 5432,
@@ -55,7 +55,7 @@ import { Coach } from "./entities/coach.entity";
 export class AppModule implements NestModule, OnModuleInit {
   constructor(
     private configService: ConfigService,
-    private dataSource: DataSource
+    private dataSource: DataSource,
   ) {}
   configure(consumer: MiddlewareConsumer) {
     const channelSecret = this.configService.get<string>("CHANNEL_SECRET");

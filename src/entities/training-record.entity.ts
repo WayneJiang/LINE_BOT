@@ -38,7 +38,11 @@ export class TrainingRecord {
   @JoinColumn({ name: "editor" })
   editor: Coach;
 
-  @ManyToOne(() => OpeningCourse, (openingCourse) => openingCourse.trainingRecord, { nullable: true })
+  @ManyToOne(
+    () => OpeningCourse,
+    (openingCourse) => openingCourse.trainingRecord,
+    { nullable: true },
+  )
   @JoinColumn({ name: "openingCourse" })
   openingCourse: OpeningCourse | null;
 }

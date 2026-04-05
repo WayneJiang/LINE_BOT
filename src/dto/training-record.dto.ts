@@ -1,11 +1,5 @@
 import { Type } from "class-transformer";
-import {
-  IsNotEmpty,
-  IsNumber,
-  Matches,
-  IsOptional,
-  IsDate,
-} from "class-validator";
+import { IsNotEmpty, IsNumber, IsOptional, IsDate } from "class-validator";
 
 export class GetTrainingRecordDto {
   @IsNumber()

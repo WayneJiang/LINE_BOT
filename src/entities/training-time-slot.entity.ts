@@ -43,7 +43,7 @@ export class TrainingTimeSlot {
 
   @ManyToOne(
     () => TrainingPlan,
-    (trainingPlan) => trainingPlan.trainingTimeSlot
+    (trainingPlan) => trainingPlan.trainingTimeSlot,
   )
   @JoinColumn({ name: "trainingPlan" })
   trainingPlan: TrainingPlan;

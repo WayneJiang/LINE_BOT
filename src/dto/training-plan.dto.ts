@@ -22,8 +22,9 @@ export class TrainingPlanDto {
   quota: number;
 
   @ValidateIf(
-    (body) =>
-      body.planType == PlanType.Personal || body.planType == PlanType.Sequential
+    (body: TrainingPlanDto) =>
+      body.planType == PlanType.Personal ||
+      body.planType == PlanType.Sequential,
   )
   @IsArray()
   @IsNotEmpty()

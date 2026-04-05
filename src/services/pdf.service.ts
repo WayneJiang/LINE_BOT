@@ -23,12 +23,20 @@ export interface SequentialSummaryRow {
 
 @Injectable()
 export class PdfService {
-  private fontPath = path.join(process.cwd(), "fonts", "NotoSansTC-Regular.ttf");
-  private fontBoldPath = path.join(process.cwd(), "fonts", "NotoSansTC-Bold.ttf");
+  private fontPath = path.join(
+    process.cwd(),
+    "fonts",
+    "NotoSansTC-Regular.ttf",
+  );
+  private fontBoldPath = path.join(
+    process.cwd(),
+    "fonts",
+    "NotoSansTC-Bold.ttf",
+  );
 
   async generateMonthlySummaryPdf(
     month: string,
-    rows: MonthlySummaryRow[]
+    rows: MonthlySummaryRow[],
   ): Promise<Buffer> {
     return new Promise((resolve, reject) => {
       const pdfDocument = new PDFDocument({ size: "A4", margin: 50 });
@@ -56,7 +64,7 @@ export class PdfService {
       const totalWidth = pdfDocument.page.width - tableLeft * 2;
       const colWidths = [
         totalWidth * 0.25,
-        totalWidth * 0.50,
+        totalWidth * 0.5,
         totalWidth * 0.25,
       ];
       const lineHeight = 16;
@@ -72,15 +80,29 @@ export class PdfService {
         isFirstPage = false;
 
         // 教練標題
-        pdfDocument.font("NotoSansTC-Bold").fontSize(20).fillColor("#000000")
+        pdfDocument
+          .font("NotoSansTC-Bold")
+          .fontSize(20)
+          .fillColor("#000000")
           .text(`${coachName} 教練 — 個人教練計畫`, { align: "center" });
-        pdfDocument.font("NotoSansTC").fontSize(12).fillColor("#666666")
+        pdfDocument
+          .font("NotoSansTC")
+          .fontSize(12)
+          .fillColor("#666666")
           .text(`${month} 月份報表`, { align: "center" });
         pdfDocument.moveDown(1);
 
         // 表頭
         let headerY = pdfDocument.y;
-        this.drawTableHeader(pdfDocument, tableLeft, headerY, colWidths, headers, totalWidth, headerHeight);
+        this.drawTableHeader(
+          pdfDocument,
+          tableLeft,
+          headerY,
+          colWidths,
+          headers,
+          totalWidth,
+          headerHeight,
+        );
         headerY = pdfDocument.y;
 
         // 表格內容
@@ -90,18 +112,29 @@ export class PdfService {
 
         coachRows.forEach((row, index) => {
           const dates = (row.checkinDates || "—").split("\n");
-          const rowHeight = Math.max(dates.length, 1) * lineHeight + cellPadding * 2;
+          const rowHeight =
+            Math.max(dates.length, 1) * lineHeight + cellPadding * 2;
 
           if (headerY + rowHeight > pdfDocument.page.height - 120) {
             pdfDocument.addPage();
             headerY = 50;
-            this.drawTableHeader(pdfDocument, tableLeft, headerY, colWidths, headers, totalWidth, headerHeight);
+            this.drawTableHeader(
+              pdfDocument,
+              tableLeft,
+              headerY,
+              colWidths,
+              headers,
+              totalWidth,
+              headerHeight,
+            );
             headerY = pdfDocument.y;
             pdfDocument.font("NotoSansTC").fillColor("#000000").fontSize(11);
           }
 
           if (index % 2 === 0) {
-            pdfDocument.rect(tableLeft, headerY, totalWidth, rowHeight).fill("#f5f5f5");
+            pdfDocument
+              .rect(tableLeft, headerY, totalWidth, rowHeight)
+              .fill("#f5f5f5");
             pdfDocument.fillColor("#000000");
           }
 
@@ -114,18 +147,28 @@ export class PdfService {
 
           // 簽到紀錄（逐行列出）
           dates.forEach((date, di) => {
-            pdfDocument.text(date, tableLeft + colWidths[0] + 8, headerY + cellPadding + di * lineHeight, {
-              width: colWidths[1] - 16,
-              align: "center",
-            });
+            pdfDocument.text(
+              date,
+              tableLeft + colWidths[0] + 8,
+              headerY + cellPadding + di * lineHeight,
+              {
+                width: colWidths[1] - 16,
+                align: "center",
+              },
+            );
           });
 
           // 上課次數（垂直置中）
           const countY = headerY + (rowHeight - lineHeight) / 2;
-          pdfDocument.text(String(row.checkinCount), tableLeft + colWidths[0] + colWidths[1] + 8, countY, {
-            width: colWidths[2] - 16,
-            align: "center",
-          });
+          pdfDocument.text(
+            String(row.checkinCount),
+            tableLeft + colWidths[0] + colWidths[1] + 8,
+            countY,
+            {
+              width: colWidths[2] - 16,
+              align: "center",
+            },
+          );
 
           totalCheckins += row.checkinCount;
           headerY += rowHeight;
@@ -138,7 +181,10 @@ export class PdfService {
           headerY = 50;
         }
         pdfDocument.rect(tableLeft, headerY, totalWidth, 36).fill("#e8f4fd");
-        pdfDocument.font("NotoSansTC-Bold").fontSize(14).fillColor("#333333")
+        pdfDocument
+          .font("NotoSansTC-Bold")
+          .fontSize(14)
+          .fillColor("#333333")
           .text(`總上課次數：${totalCheckins}`, tableLeft, headerY + 9, {
             width: totalWidth,
             align: "center",
@@ -151,7 +197,7 @@ export class PdfService {
 
   async generateSequentialSummaryPdf(
     month: string,
-    rows: SequentialSummaryRow[]
+    rows: SequentialSummaryRow[],
   ): Promise<Buffer> {
     return new Promise((resolve, reject) => {
       const pdfDocument = new PDFDocument({ size: "A4", margin: 50 });
@@ -166,11 +212,18 @@ export class PdfService {
       pdfDocument.font("NotoSansTC");
 
       // 依課程分組，再依日期分組
-      const courseMap = new Map<string, { courseTime: string; coachName: string; dates: Map<string, string[]> }>();
+      const courseMap = new Map<
+        string,
+        { courseTime: string; coachName: string; dates: Map<string, string[]> }
+      >();
       for (const row of rows) {
         const key = row.courseName;
         if (!courseMap.has(key)) {
-          courseMap.set(key, { courseTime: row.courseTime, coachName: row.coachName, dates: new Map() });
+          courseMap.set(key, {
+            courseTime: row.courseTime,
+            coachName: row.coachName,
+            dates: new Map(),
+          });
         }
         const course = courseMap.get(key);
         if (!course.dates.has(row.date)) {
@@ -183,7 +236,7 @@ export class PdfService {
       const totalWidth = pdfDocument.page.width - tableLeft * 2;
       const headers = ["日期", "學員", "上課人數"];
       const colWidths = [
-        totalWidth * 0.20,
+        totalWidth * 0.2,
         totalWidth * 0.55,
         totalWidth * 0.25,
       ];
@@ -200,15 +253,29 @@ export class PdfService {
         isFirstPage = false;
 
         // 課程標題
-        pdfDocument.font("NotoSansTC-Bold").fontSize(20).fillColor("#000000")
+        pdfDocument
+          .font("NotoSansTC-Bold")
+          .fontSize(20)
+          .fillColor("#000000")
           .text(`${course.courseTime} ${courseName}`, { align: "center" });
-        pdfDocument.font("NotoSansTC").fontSize(12).fillColor("#666666")
+        pdfDocument
+          .font("NotoSansTC")
+          .fontSize(12)
+          .fillColor("#666666")
           .text(`${course.coachName} 教練`, { align: "center" });
         pdfDocument.moveDown(1);
 
         // 表頭
         let headerY = pdfDocument.y;
-        this.drawTableHeader(pdfDocument, tableLeft, headerY, colWidths, headers, totalWidth, headerHeight);
+        this.drawTableHeader(
+          pdfDocument,
+          tableLeft,
+          headerY,
+          colWidths,
+          headers,
+          totalWidth,
+          headerHeight,
+        );
         headerY = pdfDocument.y;
 
         pdfDocument.font("NotoSansTC").fillColor("#000000").fontSize(11);
@@ -217,18 +284,29 @@ export class PdfService {
         let rowIndex = 0;
 
         for (const [date, trainees] of course.dates) {
-          const rowHeight = Math.max(trainees.length, 1) * lineHeight + cellPadding * 2;
+          const rowHeight =
+            Math.max(trainees.length, 1) * lineHeight + cellPadding * 2;
 
           if (headerY + rowHeight > pdfDocument.page.height - 120) {
             pdfDocument.addPage();
             headerY = 50;
-            this.drawTableHeader(pdfDocument, tableLeft, headerY, colWidths, headers, totalWidth, headerHeight);
+            this.drawTableHeader(
+              pdfDocument,
+              tableLeft,
+              headerY,
+              colWidths,
+              headers,
+              totalWidth,
+              headerHeight,
+            );
             headerY = pdfDocument.y;
             pdfDocument.font("NotoSansTC").fillColor("#000000").fontSize(11);
           }
 
           if (rowIndex % 2 === 0) {
-            pdfDocument.rect(tableLeft, headerY, totalWidth, rowHeight).fill("#f5f5f5");
+            pdfDocument
+              .rect(tableLeft, headerY, totalWidth, rowHeight)
+              .fill("#f5f5f5");
             pdfDocument.fillColor("#000000");
           }
 
@@ -241,18 +319,28 @@ export class PdfService {
 
           // 學員（逐行列出）
           trainees.forEach((name, ni) => {
-            pdfDocument.text(name, tableLeft + colWidths[0] + 8, headerY + cellPadding + ni * lineHeight, {
-              width: colWidths[1] - 16,
-              align: "center",
-            });
+            pdfDocument.text(
+              name,
+              tableLeft + colWidths[0] + 8,
+              headerY + cellPadding + ni * lineHeight,
+              {
+                width: colWidths[1] - 16,
+                align: "center",
+              },
+            );
           });
 
           // 上課人數（垂直置中）
           const countY = headerY + (rowHeight - lineHeight) / 2;
-          pdfDocument.text(String(trainees.length), tableLeft + colWidths[0] + colWidths[1] + 8, countY, {
-            width: colWidths[2] - 16,
-            align: "center",
-          });
+          pdfDocument.text(
+            String(trainees.length),
+            tableLeft + colWidths[0] + colWidths[1] + 8,
+            countY,
+            {
+              width: colWidths[2] - 16,
+              align: "center",
+            },
+          );
 
           totalAttendees += trainees.length;
           headerY += rowHeight;
@@ -266,7 +354,10 @@ export class PdfService {
           headerY = 50;
         }
         pdfDocument.rect(tableLeft, headerY, totalWidth, 36).fill("#e8f4fd");
-        pdfDocument.font("NotoSansTC-Bold").fontSize(14).fillColor("#333333")
+        pdfDocument
+          .font("NotoSansTC-Bold")
+          .fontSize(14)
+          .fillColor("#333333")
           .text(`總上課人次：${totalAttendees}`, tableLeft, headerY + 9, {
             width: totalWidth,
             align: "center",
@@ -284,9 +375,11 @@ export class PdfService {
     colWidths: number[],
     headers: string[],
     totalWidth: number,
-    headerHeight: number
+    headerHeight: number,
   ): void {
-    pdfDocument.rect(tableLeft, headerY, totalWidth, headerHeight).fill("#333333");
+    pdfDocument
+      .rect(tableLeft, headerY, totalWidth, headerHeight)
+      .fill("#333333");
     pdfDocument.font("NotoSansTC-Bold").fillColor("#ffffff").fontSize(12);
 
     let x = tableLeft;

@@ -24,5 +24,5 @@ export enum DayOfWeek {
 export enum CoachType {
   Founder = "Founder",
   Partner = "Partner",
-  Team = "Team"
+  Team = "Team",
 }

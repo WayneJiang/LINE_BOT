@@ -28,7 +28,7 @@ import { OpeningCourse } from "../entities/opening-course.entity";
 import { CoachDto } from "../dto/coach.dto";
 import { PdfService } from "../services/pdf.service";
 import { LineService } from "../services/line.service";
-import { put } from "@vercel/blob";
+import { messagingApi } from "@line/bot-sdk";
 
 @Controller()
 export class DataController {
@@ -36,10 +36,10 @@ export class DataController {
     private readonly dataService: DataService,
     private readonly pdfService: PdfService,
     private readonly lineService: LineService,
-  ) { }
+  ) {}
 
   @Get()
-  async healthCheck(): Promise<{ status: number; message: string }> {
+  healthCheck(): { status: number; message: string } {
     console.log();
 
     return {
@@ -50,7 +50,7 @@ export class DataController {
 
   @Get("view/:socialId")
   async getMember(
-    @Param() param: SocialIdDto
+    @Param() param: SocialIdDto,
   ): Promise<{ id: number; coach: boolean; trainee: boolean }> {
     return this.dataService.getBySocialId(param.socialId);
   }
@@ -66,12 +66,15 @@ export class DataController {
   }
 
   @Post("coach")
-  async createCoach(@Body() body: CoachDto): Promise<Boolean> {
-    return this.dataService.createCoach(body)
+  async createCoach(@Body() body: CoachDto): Promise<boolean> {
+    return this.dataService.createCoach(body);
   }
 
   @Patch("coach/:id")
-  async updateCoach(@Param() param: IdDto, @Body() body: CoachDto): Promise<Boolean> {
+  async updateCoach(
+    @Param() param: IdDto,
+    @Body() body: CoachDto,
+  ): Promise<boolean> {
     return this.dataService.updateCoach(param.id, body);
   }
 
@@ -88,61 +91,63 @@ export class DataController {
   @Post("trainee/info/:socialId")
   async createTraineeInfo(
     @Param() param: SocialIdDto,
-    @Body() body: TraineeDto
-  ): Promise<Boolean> {
+    @Body() body: TraineeDto,
+  ): Promise<boolean> {
     return this.dataService.createTrainee(param.socialId, body);
   }
 
   @Patch("trainee/info/:id")
   async updateTrainee(
     @Param() param: IdDto,
-    @Body() body: TraineeDto
-  ): Promise<Boolean> {
+    @Body() body: TraineeDto,
+  ): Promise<boolean> {
     return this.dataService.updateTrainee(param.id, body);
   }
 
   @Post("trainingPlan")
-  async createTrainingPlan(@Body() body: TrainingPlanDto): Promise<Boolean> {
+  async createTrainingPlan(@Body() body: TrainingPlanDto): Promise<boolean> {
     return this.dataService.createTrainingPlan(body);
   }
 
   @Patch("trainingPlan/:id")
   async updateTrainingPlan(
     @Param() param: IdDto,
-    @Body() body: TrainingPlanDto
-  ): Promise<Boolean> {
+    @Body() body: TrainingPlanDto,
+  ): Promise<boolean> {
     return this.dataService.updateTrainingPlan(param.id, body);
   }
 
   @Get("trainingRecord")
-  async getTrainingRecord(
-    @Query() param: GetTrainingRecordDto
-  ): Promise<{ data: TrainingRecord[]; totalPages: number; currentPage: number }> {
+  async getTrainingRecord(@Query() param: GetTrainingRecordDto): Promise<{
+    data: TrainingRecord[];
+    totalPages: number;
+    currentPage: number;
+  }> {
     return this.dataService.getTrainingRecords(param);
   }
 
   @Post("trainingRecord")
   async createTrainingRecord(
-    @Body() body: CreateTrainingRecordDto
-  ): Promise<Boolean> {
+    @Body() body: CreateTrainingRecordDto,
+  ): Promise<boolean> {
     return this.dataService.createTrainingRecord(body);
   }
 
   @Patch("trainingRecord/:id")
   async updateTrainingRecord(
     @Param() param: IdDto,
-    @Body() body: UpdateTrainingRecordDto
-  ): Promise<Boolean> {
+    @Body() body: UpdateTrainingRecordDto,
+  ): Promise<boolean> {
     return this.dataService.updateTrainingRecord(param.id, body);
   }
 
   @Delete("trainingRecord/:id")
-  async deleteTrainingRecord(@Param() param: IdDto): Promise<Boolean> {
+  async deleteTrainingRecord(@Param() param: IdDto): Promise<boolean> {
     return this.dataService.deleteTrainingRecord(param.id);
   }
 
   @Post("openingCourse")
-  async createOpeningCourse(@Body() body: OpeningCourseDto): Promise<Boolean> {
+  async createOpeningCourse(@Body() body: OpeningCourseDto): Promise<boolean> {
     return this.dataService.createOpeningCourse(body);
   }
 
@@ -154,15 +159,13 @@ export class DataController {
   @Patch("openingCourse/:id")
   async updateOpeningCourse(
     @Param() param: IdDto,
-    @Body() body: OpeningCourseDto
-  ): Promise<Boolean> {
+    @Body() body: OpeningCourseDto,
+  ): Promise<boolean> {
     return this.dataService.updateOpeningCourse(param.id, body);
   }
 
   @Get("monthlySummary")
-  async getMonthlySummary(
-    @Res() res: Response
-  ): Promise<void> {
+  getMonthlySummary(@Res() res: Response): void {
     res.type("html").send(`<!DOCTYPE html><html><body>
 <script>
   const a1 = document.createElement("a"); a1.href = "/monthlySummary/personal"; a1.click();
@@ -172,9 +175,7 @@ export class DataController {
   }
 
   @Get("monthlySummary/personal")
-  async getPersonalSummary(
-    @Res() response: Response
-  ): Promise<void> {
+  async getPersonalSummary(@Res() response: Response): Promise<void> {
     try {
       const rows = await this.dataService.getMonthlySummary();
 
@@ -184,7 +185,10 @@ export class DataController {
       }
 
       const month = rows[0].month;
-      const pdfBuffer = await this.pdfService.generateMonthlySummaryPdf(month, rows);
+      const pdfBuffer = await this.pdfService.generateMonthlySummaryPdf(
+        month,
+        rows,
+      );
 
       response.set({
         "Content-Type": "application/pdf",
@@ -192,54 +196,38 @@ export class DataController {
         "Content-Length": pdfBuffer.length,
       });
       response.end(pdfBuffer);
-    } catch (error) {
-      console.error("產生個人計畫 PDF 時發生錯誤:", error);
-      response.status(500).json({ status: "error", message: error.message });
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : JSON.stringify(error);
+      console.error("產生個人計畫 PDF 時發生錯誤:", message);
+      response.status(500).json({ status: "error", message });
     }
   }
 
   @Delete("openingCourse/:id")
-  async deleteOpeningCourse(@Param() param: IdDto): Promise<Boolean> {
+  async deleteOpeningCourse(@Param() param: IdDto): Promise<boolean> {
     return this.dataService.deleteOpeningCourse(param.id);
   }
 
   @Get("cron/monthlySummary")
-  async cronMonthlySummary(
-    @Res() response: Response
-  ): Promise<void> {
-    const TARGET_SOCIAL_IDS = (process.env.MONTHLY_SUMMARY_TARGET_SOCIAL_ID || "").split(",").filter(Boolean);
+  async cronMonthlySummary(@Res() response: Response): Promise<void> {
+    const TARGET_SOCIAL_IDS = (
+      process.env.MONTHLY_SUMMARY_TARGET_SOCIAL_ID || ""
+    )
+      .split(",")
+      .filter(Boolean);
 
     try {
-      // 同時查詢個人教練與團體課程資料
-      const [personalRows, sequentialRows] =
-        await Promise.all([
-          this.dataService.getMonthlySummary(),
-          this.dataService.getSequentialMonthlySummary(),
-        ]);
+      const result = await this.dataService.generateMonthlySummaryPdfs();
 
-      if (personalRows.length === 0 && sequentialRows.length === 0) {
+      if (!result) {
         response.json({ status: "ok", message: "無上月簽到資料" });
         return;
       }
 
-      const month = personalRows[0]?.month || sequentialRows[0]?.month;
+      const { month, uploads } = result;
 
-      // 產生兩份 PDF 並上傳至 Vercel Blob
-      const uploads: { label: string; url: string }[] = [];
-
-      if (personalRows.length > 0) {
-        const personalPdf = await this.pdfService.generateMonthlySummaryPdf(month, personalRows);
-        const { url } = await put(`${month}_個人計畫簽到統計.pdf`, personalPdf, { access: "public", allowOverwrite: true });
-        uploads.push({ label: "個人計畫簽到統計", url });
-      }
-
-      if (sequentialRows.length > 0) {
-        const sequentialPdf = await this.pdfService.generateSequentialSummaryPdf(month, sequentialRows);
-        const { url } = await put(`${month}_團體課程簽到統計.pdf`, sequentialPdf, { access: "public", allowOverwrite: true });
-        uploads.push({ label: "團體課程簽到統計", url });
-      }
-
-      const flexContent = {
+      const flexContent: messagingApi.FlexBubble = {
         type: "bubble",
         body: {
           type: "box",
@@ -288,23 +276,27 @@ export class DataController {
 
       await Promise.all(
         TARGET_SOCIAL_IDS.map((id) =>
-          this.lineService.pushFlexMessage(id, `${month} 簽到統計`, flexContent)
-        )
+          this.lineService.pushFlexMessage(
+            id,
+            `${month} 簽到統計`,
+            flexContent,
+          ),
+        ),
       );
 
       const labels = uploads.map((upload) => upload.label).join("、");
       console.log(`✅ 已發送 ${month} ${labels}`);
       response.json({ status: "ok", message: `已發送 ${month} ${labels}` });
-    } catch (error) {
-      console.error("發送時發生錯誤:", error);
-      response.status(500).json({ status: "error", message: error.message });
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : JSON.stringify(error);
+      console.error("發送時發生錯誤:", message);
+      response.status(500).json({ status: "error", message });
     }
   }
 
   @Get("monthlySummary/sequential")
-  async getSequentialSummary(
-    @Res() response: Response
-  ): Promise<void> {
+  async getSequentialSummary(@Res() response: Response): Promise<void> {
     try {
       const rows = await this.dataService.getSequentialMonthlySummary();
 
@@ -314,7 +306,10 @@ export class DataController {
       }
 
       const month = rows[0].month;
-      const pdfBuffer = await this.pdfService.generateSequentialSummaryPdf(month, rows);
+      const pdfBuffer = await this.pdfService.generateSequentialSummaryPdf(
+        month,
+        rows,
+      );
 
       response.set({
         "Content-Type": "application/pdf",
@@ -322,9 +317,11 @@ export class DataController {
         "Content-Length": pdfBuffer.length,
       });
       response.end(pdfBuffer);
-    } catch (error) {
-      console.error("產生團體課程 PDF 時發生錯誤:", error);
-      response.status(500).json({ status: "error", message: error.message });
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : JSON.stringify(error);
+      console.error("產生團體課程 PDF 時發生錯誤:", message);
+      response.status(500).json({ status: "error", message });
     }
   }
 }

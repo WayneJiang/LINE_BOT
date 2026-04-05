@@ -1,15 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import {
-  ClientConfig,
-  MessageEvent,
-  messagingApi,
-  PostbackEvent,
-} from "@line/bot-sdk";
-import {
-  MessagingApiClient,
-  ReplyMessageResponse,
-} from "@line/bot-sdk/dist/messaging-api/api";
+import { messagingApi, webhook } from "@line/bot-sdk";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { TrainingRecord } from "src/entities/training-record.entity";
@@ -20,13 +11,25 @@ import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
 import { DayOfWeek, PlanType } from "src/enums/enum-constant";
+import { DataService } from "src/services/data.service";
+
+interface AvailablePlanRaw {
+  id: number;
+  planType: PlanType;
+  coach: string;
+  remainingQuota: number;
+  openingCourseId?: number;
+  start?: string;
+  end?: string;
+}
 
 @Injectable()
 export class LineService {
-  private messagingApiClient: MessagingApiClient;
+  private messagingApiClient: messagingApi.MessagingApiClient;
 
   constructor(
     private configService: ConfigService,
+    private dataService: DataService,
     @InjectRepository(Trainee)
     private traineeRepository: Repository<Trainee>,
     @InjectRepository(TrainingRecord)
@@ -34,20 +37,20 @@ export class LineService {
     @InjectRepository(TrainingPlan)
     private trainingPlanRepository: Repository<TrainingPlan>,
     @InjectRepository(OpeningCourse)
-    private openingCourseRepository: Repository<OpeningCourse>
+    private openingCourseRepository: Repository<OpeningCourse>,
   ) {
     const channelAccessToken = this.configService.get<string>(
-      "CHANNEL_ACCESS_TOKEN"
+      "CHANNEL_ACCESS_TOKEN",
     );
 
-    const clientConfig: ClientConfig = {
+    const clientConfig = {
       channelAccessToken: channelAccessToken || "",
     };
 
     this.messagingApiClient = new messagingApi.MessagingApiClient(clientConfig);
   }
 
-  async handleTextMessage(event: MessageEvent): Promise<void> {
+  async handleTextMessage(event: webhook.MessageEvent): Promise<void> {
     if (event.message.type != "text") {
       return;
     }
@@ -56,12 +59,16 @@ export class LineService {
     dayjs.extend(timezone);
 
     const replyToken = event.replyToken;
-    const now = dayjs().tz("Asia/Taipei");
-    let lineResponse: ReplyMessageResponse;
+    let lineResponse: messagingApi.ReplyMessageResponse;
+
+    await this.messagingApiClient.showLoadingAnimation({
+      chatId: event.source?.userId || "",
+      loadingSeconds: 10,
+    });
 
     switch (event.message.text) {
-      case "簽到":
-        let contents = [];
+      case "訓練簽到": {
+        const contents: messagingApi.FlexBubble[] = [];
 
         const socialId = event.source?.userId;
         if (socialId) {
@@ -76,23 +83,29 @@ export class LineService {
               .leftJoin(
                 "TrainingRecord",
                 "trainingRecord",
-                "trainingRecord.trainingPlan = trainingPlan.id"
+                "trainingRecord.trainingPlan = trainingPlan.id",
               )
               .where("trainingPlan.trainee = :traineeId", {
                 traineeId: trainee.id,
               })
               .andWhere("trainingPlan.planType IN (:...planTypes)", {
-                planTypes: [PlanType.Personal, PlanType.FlexiblePersonal, PlanType.Block],
+                planTypes: [
+                  PlanType.Personal,
+                  PlanType.FlexiblePersonal,
+                  PlanType.Block,
+                ],
               })
               .groupBy("trainingPlan.id, coach.name")
-              .having("trainingPlan.quota - COUNT(DISTINCT trainingRecord.id) > 0")
+              .having(
+                "trainingPlan.quota - COUNT(DISTINCT trainingRecord.id) > 0",
+              )
               .select([
                 'trainingPlan.id AS "id"',
                 'trainingPlan.planType AS "planType"',
                 'coach.name AS "coach"',
                 'trainingPlan.quota - COUNT(DISTINCT trainingRecord.id) AS "remainingQuota"',
               ])
-              .getRawMany();
+              .getRawMany<AvailablePlanRaw>();
 
             const dayOfWeekMap = [
               DayOfWeek.Sunday,
@@ -112,7 +125,7 @@ export class LineService {
               .leftJoin(
                 "TrainingRecord",
                 "trainingRecord",
-                "trainingRecord.trainingPlan = trainingPlan.id"
+                "trainingRecord.trainingPlan = trainingPlan.id",
               )
               .where("trainingPlan.trainee = :traineeId", {
                 traineeId: trainee.id,
@@ -123,7 +136,9 @@ export class LineService {
               .andWhere("openingCourse.dayOfWeek = :today", {
                 today,
               })
-              .groupBy("trainingPlan.id, openingCourse.id, coach.name, openingCourse.start, openingCourse.end")
+              .groupBy(
+                "trainingPlan.id, openingCourse.id, coach.name, openingCourse.start, openingCourse.end",
+              )
               .having("trainingPlan.quota - COUNT(trainingRecord.id) > 0")
               .select([
                 'trainingPlan.id AS "id"',
@@ -134,7 +149,7 @@ export class LineService {
                 'openingCourse.start AS "start"',
                 'openingCourse.end AS "end"',
               ])
-              .getRawMany();
+              .getRawMany<AvailablePlanRaw>();
 
             const allAvailablePlans = [
               ...personalAndBlockPlans,
@@ -156,9 +171,10 @@ export class LineService {
                       gravity: "center",
                       size: "xl",
                       color: "#0080FF",
-                      text: plan.planType === PlanType.Sequential
-                        ? `${this.planTypeToText(plan.planType)} ${plan.start}~${plan.end}`
-                        : this.planTypeToText(plan.planType),
+                      text:
+                        plan.planType === PlanType.Sequential
+                          ? `${this.planTypeToText(plan.planType)} ${plan.start}~${plan.end}`
+                          : this.planTypeToText(plan.planType),
                       wrap: true,
                     },
                     {
@@ -231,7 +247,7 @@ export class LineService {
                       color: "#FF2D2D",
                       action: {
                         type: "postback",
-                        label: "簽到",
+                        label: "訓練簽到",
                         data: `/debut/${plan.id}/${plan.openingCourseId || 0}`,
                       },
                     },
@@ -246,7 +262,7 @@ export class LineService {
                 messages: [
                   {
                     type: "flex",
-                    altText: "簽到",
+                    altText: "訓練簽到",
                     contents: {
                       type: "carousel",
                       contents: contents,
@@ -260,7 +276,7 @@ export class LineService {
                 messages: [
                   {
                     type: "flex",
-                    altText: "簽到",
+                    altText: "訓練簽到",
                     contents: {
                       type: "bubble",
                       body: {
@@ -318,7 +334,7 @@ export class LineService {
               messages: [
                 {
                   type: "flex",
-                  altText: "簽到",
+                  altText: "訓練簽到",
                   contents: {
                     type: "bubble",
                     body: {
@@ -383,6 +399,7 @@ export class LineService {
         }
 
         break;
+      }
       case "個人資訊":
         lineResponse = await this.messagingApiClient.replyMessage({
           replyToken: replyToken,
@@ -431,13 +448,13 @@ export class LineService {
           ],
         });
         break;
-      case "查詢":
+      case "管理頁面":
         lineResponse = await this.messagingApiClient.replyMessage({
           replyToken: replyToken,
           messages: [
             {
               type: "flex",
-              altText: "查詢",
+              altText: "管理頁面",
               contents: {
                 type: "bubble",
                 body: {
@@ -446,7 +463,7 @@ export class LineService {
                   contents: [
                     {
                       type: "text",
-                      text: "查詢所有學員資訊",
+                      text: "管理頁面",
                       weight: "bold",
                       size: "xl",
                     },
@@ -479,31 +496,17 @@ export class LineService {
           ],
         });
         break;
-      case "匯出":
-        lineResponse = await this.messagingApiClient.replyMessage({
-          replyToken: replyToken,
-          messages: [
-            {
-              type: "flex",
-              altText: "匯出",
-              contents: {
-                type: "bubble",
-                hero: {
-                  type: "image",
-                  url: "https://i.meee.com.tw/tPKAVXu.png",
-                  size: "full",
-                },
-              },
-            },
-          ],
-        });
+      case "產生報表":
+        await this.generateAndSendMonthlySummary(replyToken);
         break;
     }
 
-    console.log(lineResponse);
+    if (lineResponse) {
+      console.log(lineResponse);
+    }
   }
 
-  async handlePostBack(event: PostbackEvent): Promise<void> {
+  async handlePostBack(event: webhook.PostbackEvent): Promise<void> {
     if (event.type != "postback") {
       return;
     }
@@ -517,7 +520,7 @@ export class LineService {
 
     const data = event.postback.data.split("/");
 
-    const debut = (data[1] == "debut");
+    const debut = data[1] == "debut";
     const planId = Number(data[2]);
     const openingCourseId = data[3] ? Number(data[3]) : 0;
 
@@ -527,7 +530,7 @@ export class LineService {
     });
 
     const profile = await this.messagingApiClient.getProfile(
-      event.source?.userId || ""
+      event.source?.userId || "",
     );
     console.log(JSON.stringify(profile));
 
@@ -543,9 +546,12 @@ export class LineService {
 
       if (trainingPlan) {
         // 取得 OpeningCourse（如果有的話）
-        const openingCourse = openingCourseId > 0
-          ? await this.openingCourseRepository.findOneBy({ id: openingCourseId })
-          : null;
+        const openingCourse =
+          openingCourseId > 0
+            ? await this.openingCourseRepository.findOneBy({
+                id: openingCourseId,
+              })
+            : null;
 
         // 檢查當天是否已經有這個 TrainingPlan 的 TrainingRecord
         const today = dayjs().startOf("day").toDate();
@@ -593,7 +599,7 @@ export class LineService {
                         align: "center",
                         gravity: "center",
                         margin: "md",
-                        size: "xs"
+                        size: "xs",
                       },
                       {
                         type: "text",
@@ -604,7 +610,7 @@ export class LineService {
                         margin: "md",
                         size: "lg",
                         color: "#019858",
-                      }
+                      },
                     ],
                   },
                   footer: {
@@ -630,7 +636,7 @@ export class LineService {
                         action: {
                           type: "message",
                           label: "沒事了",
-                          text: "沒事了"
+                          text: "沒事了",
                         },
                       },
                     ],
@@ -654,7 +660,7 @@ export class LineService {
             .leftJoinAndSelect("trainingPlan.coach", "coach")
             .leftJoinAndSelect(
               "trainingPlan.trainingTimeSlot",
-              "trainingTimeSlot"
+              "trainingTimeSlot",
             )
             .where("trainingPlan.planType = :planType", {
               planType: PlanType.Block,
@@ -698,7 +704,7 @@ export class LineService {
                 this.trainingRecordRepository.create({
                   trainee: blockPlan.trainee,
                   trainingPlan: blockPlan,
-                })
+                }),
               );
             }
           }
@@ -709,7 +715,7 @@ export class LineService {
               trainee: trainee,
               trainingPlan: trainingPlan,
               openingCourse: openingCourse,
-            })
+            }),
           );
         }
 
@@ -884,7 +890,7 @@ export class LineService {
   async pushFlexMessage(
     socialId: string,
     altText: string,
-    flexContents: object
+    flexContents: messagingApi.FlexContainer,
   ): Promise<void> {
     await this.messagingApiClient.pushMessage({
       to: socialId,
@@ -892,7 +898,79 @@ export class LineService {
         {
           type: "flex",
           altText,
-          contents: flexContents as any,
+          contents: flexContents,
+        },
+      ],
+    });
+  }
+
+  async generateAndSendMonthlySummary(replyToken: string): Promise<void> {
+    const result = await this.dataService.generateMonthlySummaryPdfs();
+
+    if (!result) {
+      await this.messagingApiClient.replyMessage({
+        replyToken,
+        messages: [{ type: "text", text: "無上月簽到資料" }],
+      });
+      return;
+    }
+
+    const { month, uploads } = result;
+
+    const flexContent: messagingApi.FlexBubble = {
+      type: "bubble",
+      body: {
+        type: "box",
+        layout: "vertical",
+        contents: [
+          {
+            type: "text",
+            text: "月度簽到統計",
+            weight: "bold",
+            size: "xl",
+            align: "center",
+          },
+          {
+            type: "separator",
+            color: "#ADADAD",
+            margin: "md",
+          },
+          {
+            type: "text",
+            text: `${month} 月份`,
+            size: "lg",
+            margin: "lg",
+            align: "center",
+            color: "#0080FF",
+            weight: "bold",
+          },
+        ],
+      },
+      footer: {
+        type: "box",
+        layout: "vertical",
+        spacing: "sm",
+        contents: uploads.map((item) => ({
+          type: "button" as const,
+          style: "primary" as const,
+          height: "sm" as const,
+          color: "#0080FF",
+          action: {
+            type: "uri" as const,
+            label: `下載${item.label}`,
+            uri: item.url,
+          },
+        })),
+      },
+    };
+
+    await this.messagingApiClient.replyMessage({
+      replyToken,
+      messages: [
+        {
+          type: "flex",
+          altText: `${month} 簽到統計`,
+          contents: flexContent,
         },
       ],
     });

@@ -55,13 +55,13 @@ export class TrainingPlan {
 
   @OneToMany(
     () => TrainingRecord,
-    (trainingRecord) => trainingRecord.trainingPlan
+    (trainingRecord) => trainingRecord.trainingPlan,
   )
   trainingRecord: TrainingRecord[];
 
   @OneToMany(
     () => TrainingTimeSlot,
-    (trainingTimeSlot) => trainingTimeSlot.trainingPlan
+    (trainingTimeSlot) => trainingTimeSlot.trainingPlan,
   )
   trainingTimeSlot: TrainingTimeSlot[];
 }

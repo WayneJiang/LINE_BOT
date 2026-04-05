@@ -17,6 +17,29 @@ import { TrainingRecord } from "src/entities/training-record.entity";
 import { TrainingTimeSlot } from "src/entities/training-time-slot.entity";
 import { Repository } from "typeorm";
 import { CoachDto } from "src/dto/coach.dto";
+import { PdfService } from "src/services/pdf.service";
+import { put } from "@vercel/blob";
+
+interface MonthlySummaryRaw {
+  coachName: string;
+  traineeName: string;
+  planType: string;
+  month: string;
+  quota: number;
+  checkinCount: number;
+  checkinDates: string;
+}
+
+interface SequentialSummaryRaw {
+  courseName: string;
+  dayOfWeek: string;
+  courseStart: string;
+  courseEnd: string;
+  coachName: string;
+  month: string;
+  date: string;
+  traineeName: string;
+}
 
 @Injectable()
 export class DataService {
@@ -32,11 +55,12 @@ export class DataService {
     @InjectRepository(TrainingTimeSlot)
     private trainingTimeSlotRepository: Repository<TrainingTimeSlot>,
     @InjectRepository(OpeningCourse)
-    private openingCourseRepository: Repository<OpeningCourse>
-  ) { }
+    private openingCourseRepository: Repository<OpeningCourse>,
+    private pdfService: PdfService,
+  ) {}
 
   async getBySocialId(
-    socialId: string
+    socialId: string,
   ): Promise<{ id: number; coach: boolean; trainee: boolean }> {
     const coach = await this.coachRepository.findOneBy({ socialId });
     const trainee = await this.traineeRepository.findOneBy({ socialId });
@@ -66,7 +90,7 @@ export class DataService {
       .leftJoinAndSelect("trainee.trainingPlan", "trainingPlanList")
       .leftJoinAndSelect(
         "trainingPlanList.trainingTimeSlot",
-        "trainingTimeSlot"
+        "trainingTimeSlot",
       )
       .leftJoinAndSelect("trainingPlanList.coach", "coach")
       .leftJoinAndSelect("trainingPlanList.editor", "editor")
@@ -104,7 +128,7 @@ export class DataService {
       const coach = this.coachRepository.create({
         socialId: "",
         name: body.name,
-        coachType: body.coachType
+        coachType: body.coachType,
       });
 
       await this.coachRepository.save(coach);
@@ -132,8 +156,8 @@ export class DataService {
         {
           name: body.name,
           coachType: body.coachType,
-          socialId: body.socialId
-        }
+          socialId: body.socialId,
+        },
       );
 
       return true;
@@ -201,7 +225,7 @@ export class DataService {
           weight: body.weight,
           phone: body.phone,
           note: body.note,
-        }
+        },
       );
 
       return true;
@@ -214,13 +238,14 @@ export class DataService {
   async createTrainingPlan(body: TrainingPlanDto): Promise<boolean> {
     try {
       // 驗證相關實體是否存在
-      const [trainee, coach, editor] = await Promise.all([
-        this.traineeRepository.findOneBy({ id: body.trainee }),
+      const trainee = await this.traineeRepository.findOneBy({
+        id: body.trainee,
+      });
+      const coach =
         body.planType === PlanType.Block
-          ? Promise.resolve(null)
-          : this.coachRepository.findOneBy({ id: body.coach }),
-        this.coachRepository.findOneBy({ id: body.editor }),
-      ]);
+          ? null
+          : await this.coachRepository.findOneBy({ id: body.coach });
+      const editor = await this.coachRepository.findOneBy({ id: body.editor });
 
       if (!trainee || !editor) {
         return false;
@@ -252,7 +277,7 @@ export class DataService {
             start: timeSlot.start,
             end: timeSlot.end,
             trainingPlan: savedTrainingPlan,
-          })
+          }),
         );
 
         // 儲存所有訓練時段
@@ -268,7 +293,7 @@ export class DataService {
 
   async updateTrainingPlan(
     id: number,
-    body: TrainingPlanDto
+    body: TrainingPlanDto,
   ): Promise<boolean> {
     try {
       // 驗證 TrainingPlan 是否存在
@@ -282,12 +307,13 @@ export class DataService {
       }
 
       // 驗證相關實體是否存在
-      const [coach, editor] = await Promise.all([
+      const coach =
         body.planType === PlanType.Block
-          ? Promise.resolve(null)
-          : this.coachRepository.findOne({ where: { id: body.coach } }),
-        this.coachRepository.findOne({ where: { id: body.editor } }),
-      ]);
+          ? null
+          : await this.coachRepository.findOne({ where: { id: body.coach } });
+      const editor = await this.coachRepository.findOne({
+        where: { id: body.editor },
+      });
 
       if (!editor) {
         return false;
@@ -306,7 +332,7 @@ export class DataService {
           quota: body.quota,
           coach: body.planType == PlanType.Block ? null : coach,
           editor: editor,
-        }
+        },
       );
 
       // 處理訓練時段的更新
@@ -323,7 +349,7 @@ export class DataService {
             start: timeSlot.start,
             end: timeSlot.end,
             trainingPlan: trainingPlan,
-          })
+          }),
         );
 
         // 儲存新的訓練時段
@@ -337,9 +363,11 @@ export class DataService {
     }
   }
 
-  async getTrainingRecords(
-    body: GetTrainingRecordDto
-  ): Promise<{ data: TrainingRecord[]; totalPages: number; currentPage: number }> {
+  async getTrainingRecords(body: GetTrainingRecordDto): Promise<{
+    data: TrainingRecord[];
+    totalPages: number;
+    currentPage: number;
+  }> {
     try {
       const pageSize = 30;
       const page = body.page || 1;
@@ -362,10 +390,7 @@ export class DataService {
       const totalPages = Math.ceil(totalCount / pageSize);
 
       // 取得分頁資料
-      const data = await queryBuilder
-        .skip(skip)
-        .take(pageSize)
-        .getMany();
+      const data = await queryBuilder.skip(skip).take(pageSize).getMany();
 
       return {
         data,
@@ -413,7 +438,7 @@ export class DataService {
 
   async updateTrainingRecord(
     id: number,
-    body: UpdateTrainingRecordDto
+    body: UpdateTrainingRecordDto,
   ): Promise<boolean> {
     try {
       // 驗證 TrainingRecord 是否存在
@@ -442,7 +467,7 @@ export class DataService {
           trainingPlan: trainingPlan,
           editor: editor,
           createdDate: body.date,
-        }
+        },
       );
 
       return true;
@@ -515,7 +540,7 @@ export class DataService {
 
   async updateOpeningCourse(
     id: number,
-    body: OpeningCourseDto
+    body: OpeningCourseDto,
   ): Promise<boolean> {
     try {
       // 驗證 OpeningCourse 是否存在
@@ -548,35 +573,50 @@ export class DataService {
   }
 
   async getMonthlySummary(): Promise<
-    { coachName: string; traineeName: string; planType: string; month: string; quota: number; checkinCount: number; checkinDates: string }[]
+    {
+      coachName: string;
+      traineeName: string;
+      planType: string;
+      month: string;
+      quota: number;
+      checkinCount: number;
+      checkinDates: string;
+    }[]
   > {
     try {
       // 查詢個人教練計畫的上月簽到摘要，含簽到日期
-      const results =
-        await this.trainingPlanRepository
-          .createQueryBuilder("trainingPlan")
-          .innerJoin("trainingPlan.coach", "coach")
-          .innerJoin("trainingPlan.trainee", "trainee")
-          .innerJoin("trainingPlan.trainingRecord", "trainingRecord")
-          .where("DATE_TRUNC('month', trainingRecord.createdDate) = DATE_TRUNC('month', CURRENT_DATE - INTERVAL '1 month')")
-          .andWhere("trainingPlan.planType IN (:...planTypes)", {
-            planTypes: [PlanType.Personal, PlanType.FlexiblePersonal],
-          })
-          .select("coach.name", "coachName")
-          .addSelect("trainee.name", "traineeName")
-          .addSelect("trainingPlan.planType", "planType")
-          .addSelect("TO_CHAR(DATE_TRUNC('month', trainingRecord.createdDate), 'YYYY-MM')", "month")
-          .addSelect("trainingPlan.quota", "quota")
-          .addSelect("COUNT(trainingRecord.id)", "checkinCount")
-          .addSelect("STRING_AGG(TO_CHAR(trainingRecord.createdDate, 'MM/DD HH24:MI'), CHR(10) ORDER BY trainingRecord.createdDate)", "checkinDates")
-          .groupBy("coach.name")
-          .addGroupBy("trainee.name")
-          .addGroupBy("trainingPlan.planType")
-          .addGroupBy("DATE_TRUNC('month', trainingRecord.createdDate)")
-          .addGroupBy("trainingPlan.quota")
-          .orderBy("coach.name", "ASC")
-          .addOrderBy("trainee.name", "ASC")
-          .getRawMany();
+      const results = await this.trainingPlanRepository
+        .createQueryBuilder("trainingPlan")
+        .innerJoin("trainingPlan.coach", "coach")
+        .innerJoin("trainingPlan.trainee", "trainee")
+        .innerJoin("trainingPlan.trainingRecord", "trainingRecord")
+        .where(
+          "DATE_TRUNC('month', trainingRecord.createdDate) = DATE_TRUNC('month', CURRENT_DATE - INTERVAL '1 month')",
+        )
+        .andWhere("trainingPlan.planType IN (:...planTypes)", {
+          planTypes: [PlanType.Personal, PlanType.FlexiblePersonal],
+        })
+        .select("coach.name", "coachName")
+        .addSelect("trainee.name", "traineeName")
+        .addSelect("trainingPlan.planType", "planType")
+        .addSelect(
+          "TO_CHAR(DATE_TRUNC('month', trainingRecord.createdDate), 'YYYY-MM')",
+          "month",
+        )
+        .addSelect("trainingPlan.quota", "quota")
+        .addSelect("COUNT(trainingRecord.id)", "checkinCount")
+        .addSelect(
+          "STRING_AGG(TO_CHAR(trainingRecord.createdDate, 'MM/DD HH24:MI'), CHR(10) ORDER BY trainingRecord.createdDate)",
+          "checkinDates",
+        )
+        .groupBy("coach.name")
+        .addGroupBy("trainee.name")
+        .addGroupBy("trainingPlan.planType")
+        .addGroupBy("DATE_TRUNC('month', trainingRecord.createdDate)")
+        .addGroupBy("trainingPlan.quota")
+        .orderBy("coach.name", "ASC")
+        .addOrderBy("trainee.name", "ASC")
+        .getRawMany<MonthlySummaryRaw>();
 
       return results.map((result) => ({
         coachName: result.coachName,
@@ -594,7 +634,14 @@ export class DataService {
   }
 
   async getSequentialMonthlySummary(): Promise<
-    { courseName: string; courseTime: string; coachName: string; month: string; date: string; traineeName: string }[]
+    {
+      courseName: string;
+      courseTime: string;
+      coachName: string;
+      month: string;
+      date: string;
+      traineeName: string;
+    }[]
   > {
     const DAY_OF_WEEK_LABEL: Record<string, string> = {
       Monday: "週一",
@@ -607,27 +654,33 @@ export class DataService {
     };
 
     try {
-      const results =
-        await this.trainingRecordRepository
-          .createQueryBuilder("record")
-          .innerJoin("record.trainingPlan", "plan")
-          .innerJoin("record.trainee", "trainee")
-          .innerJoin("record.openingCourse", "course")
-          .innerJoin("course.coach", "coach")
-          .where("DATE_TRUNC('month', record.createdDate) = DATE_TRUNC('month', CURRENT_DATE - INTERVAL '1 month')")
-          .andWhere("plan.planType = :planType", { planType: PlanType.Sequential })
-          .select("course.name", "courseName")
-          .addSelect("course.dayOfWeek", "dayOfWeek")
-          .addSelect("course.start", "courseStart")
-          .addSelect("course.end", "courseEnd")
-          .addSelect("coach.name", "coachName")
-          .addSelect("TO_CHAR(DATE_TRUNC('month', record.createdDate), 'YYYY-MM')", "month")
-          .addSelect("TO_CHAR(record.createdDate, 'MM/DD')", "date")
-          .addSelect("trainee.name", "traineeName")
-          .orderBy("TO_CHAR(record.createdDate, 'MM/DD')", "ASC")
-          .addOrderBy("course.name", "ASC")
-          .addOrderBy("trainee.name", "ASC")
-          .getRawMany();
+      const results = await this.trainingRecordRepository
+        .createQueryBuilder("record")
+        .innerJoin("record.trainingPlan", "plan")
+        .innerJoin("record.trainee", "trainee")
+        .innerJoin("record.openingCourse", "course")
+        .innerJoin("course.coach", "coach")
+        .where(
+          "DATE_TRUNC('month', record.createdDate) = DATE_TRUNC('month', CURRENT_DATE - INTERVAL '1 month')",
+        )
+        .andWhere("plan.planType = :planType", {
+          planType: PlanType.Sequential,
+        })
+        .select("course.name", "courseName")
+        .addSelect("course.dayOfWeek", "dayOfWeek")
+        .addSelect("course.start", "courseStart")
+        .addSelect("course.end", "courseEnd")
+        .addSelect("coach.name", "coachName")
+        .addSelect(
+          "TO_CHAR(DATE_TRUNC('month', record.createdDate), 'YYYY-MM')",
+          "month",
+        )
+        .addSelect("TO_CHAR(record.createdDate, 'MM/DD')", "date")
+        .addSelect("trainee.name", "traineeName")
+        .orderBy("TO_CHAR(record.createdDate, 'MM/DD')", "ASC")
+        .addOrderBy("course.name", "ASC")
+        .addOrderBy("trainee.name", "ASC")
+        .getRawMany<SequentialSummaryRaw>();
 
       return results.map((result) => ({
         courseName: result.courseName,
@@ -641,6 +694,49 @@ export class DataService {
       console.error("查詢團體課程月度摘要時發生錯誤:", error);
       return [];
     }
+  }
+
+  async generateMonthlySummaryPdfs(): Promise<{
+    month: string;
+    uploads: { label: string; url: string }[];
+  } | null> {
+    const [personalRows, sequentialRows] = await Promise.all([
+      this.getMonthlySummary(),
+      this.getSequentialMonthlySummary(),
+    ]);
+
+    if (personalRows.length === 0 && sequentialRows.length === 0) {
+      return null;
+    }
+
+    const month = personalRows[0]?.month || sequentialRows[0]?.month;
+    const uploads: { label: string; url: string }[] = [];
+
+    if (personalRows.length > 0) {
+      const pdf = await this.pdfService.generateMonthlySummaryPdf(
+        month,
+        personalRows,
+      );
+      const { url } = await put(`${month}_個人計畫簽到統計.pdf`, pdf, {
+        access: "public",
+        allowOverwrite: true,
+      });
+      uploads.push({ label: "個人計畫簽到統計", url });
+    }
+
+    if (sequentialRows.length > 0) {
+      const pdf = await this.pdfService.generateSequentialSummaryPdf(
+        month,
+        sequentialRows,
+      );
+      const { url } = await put(`${month}_團體課程簽到統計.pdf`, pdf, {
+        access: "public",
+        allowOverwrite: true,
+      });
+      uploads.push({ label: "團體課程簽到統計", url });
+    }
+
+    return { month, uploads };
   }
 
   async deleteOpeningCourse(id: number): Promise<boolean> {
