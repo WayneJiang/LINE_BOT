@@ -30,6 +30,19 @@ interface MonthlySummaryRaw {
   checkinDates: string;
 }
 
+interface YearlySummaryRaw {
+  coachName: string;
+  year: string;
+  totalCheckins: string;
+}
+
+interface SequentialYearlySummaryRaw {
+  coachName: string;
+  year: string;
+  totalAttendees: string;
+  totalSessions: string;
+}
+
 interface SequentialSummaryRaw {
   courseName: string;
   dayOfWeek: string;
@@ -696,14 +709,92 @@ export class DataService {
     }
   }
 
+  async getPersonalYearlySummary(): Promise<
+    {
+      coachName: string;
+      year: string;
+      totalAttendees: number;
+      totalSessions: number;
+    }[]
+  > {
+    try {
+      const results = await this.trainingPlanRepository.query(`
+        SELECT
+          coach.name AS "coachName",
+          TO_CHAR(DATE_TRUNC('year', r."createdDate"), 'YYYY') AS "year",
+          COUNT(DISTINCT tp.trainee)::int AS "totalAttendees",
+          COUNT(r.id)::int AS "totalSessions"
+        FROM "TrainingPlan" tp
+        INNER JOIN "Coach" coach ON coach.id = tp.coach
+        INNER JOIN "TrainingRecord" r ON r."trainingPlan" = tp.id
+        WHERE r."createdDate" >= DATE_TRUNC('year', CURRENT_DATE - INTERVAL '1 month')
+          AND r."createdDate" < DATE_TRUNC('month', CURRENT_DATE)
+          AND tp."planType" IN ('Personal', 'FlexiblePersonal')
+        GROUP BY coach.name, DATE_TRUNC('year', r."createdDate")
+        ORDER BY coach.name ASC
+      `);
+
+      return results.map((r) => ({
+        coachName: r.coachName,
+        year: r.year,
+        totalAttendees: Number(r.totalAttendees),
+        totalSessions: Number(r.totalSessions),
+      }));
+    } catch (error) {
+      console.error("查詢個人計畫年度總結時發生錯誤:", error);
+      return [];
+    }
+  }
+
+  async getSequentialYearlySummary(): Promise<
+    {
+      coachName: string;
+      year: string;
+      totalAttendees: number;
+      totalSessions: number;
+    }[]
+  > {
+    try {
+      const results = await this.trainingRecordRepository.query(`
+        SELECT
+          coach.name AS "coachName",
+          TO_CHAR(DATE_TRUNC('year', r."createdDate"), 'YYYY') AS "year",
+          COUNT(DISTINCT r.trainee)::int AS "totalAttendees",
+          COUNT(DISTINCT DATE_TRUNC('day', r."createdDate") || '-' || r."openingCourse")::int AS "totalSessions"
+        FROM "TrainingRecord" r
+        INNER JOIN "TrainingPlan" tp ON tp.id = r."trainingPlan"
+        INNER JOIN "OpeningCourse" oc ON oc.id = r."openingCourse"
+        INNER JOIN "Coach" coach ON coach.id = oc.coach
+        WHERE r."createdDate" >= DATE_TRUNC('year', CURRENT_DATE - INTERVAL '1 month')
+          AND r."createdDate" < DATE_TRUNC('month', CURRENT_DATE)
+          AND tp."planType" = 'Sequential'
+        GROUP BY coach.name, DATE_TRUNC('year', r."createdDate")
+        ORDER BY coach.name ASC
+      `);
+
+      return results.map((r) => ({
+        coachName: r.coachName,
+        year: r.year,
+        totalAttendees: Number(r.totalAttendees),
+        totalSessions: Number(r.totalSessions),
+      }));
+    } catch (error) {
+      console.error("查詢團體課程年度總結時發生錯誤:", error);
+      return [];
+    }
+  }
+
   async generateMonthlySummaryPdfs(): Promise<{
     month: string;
     uploads: { label: string; url: string }[];
   } | null> {
-    const [personalRows, sequentialRows] = await Promise.all([
-      this.getMonthlySummary(),
-      this.getSequentialMonthlySummary(),
-    ]);
+    const [personalRows, sequentialRows, personalYearly, sequentialYearly] =
+      await Promise.all([
+        this.getMonthlySummary(),
+        this.getSequentialMonthlySummary(),
+        this.getPersonalYearlySummary(),
+        this.getSequentialYearlySummary(),
+      ]);
 
     if (personalRows.length === 0 && sequentialRows.length === 0) {
       return null;
@@ -716,6 +807,7 @@ export class DataService {
       const pdf = await this.pdfService.generateMonthlySummaryPdf(
         month,
         personalRows,
+        personalYearly,
       );
       const { url } = await put(`${month}_個人計畫簽到統計.pdf`, pdf, {
         access: "public",
@@ -728,6 +820,7 @@ export class DataService {
       const pdf = await this.pdfService.generateSequentialSummaryPdf(
         month,
         sequentialRows,
+        sequentialYearly,
       );
       const { url } = await put(`${month}_團體課程簽到統計.pdf`, pdf, {
         access: "public",

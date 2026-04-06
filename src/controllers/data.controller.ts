@@ -167,10 +167,8 @@ export class DataController {
   @Get("monthlySummary")
   getMonthlySummary(@Res() res: Response): void {
     res.type("html").send(`<!DOCTYPE html><html><body>
-<script>
-  const a1 = document.createElement("a"); a1.href = "/monthlySummary/personal"; a1.click();
-  setTimeout(() => { const a2 = document.createElement("a"); a2.href = "/monthlySummary/sequential"; a2.click(); }, 1000);
-</script>
+<iframe src="/monthlySummary/personal" style="display:none"></iframe>
+<iframe src="/monthlySummary/sequential" style="display:none"></iframe>
 </body></html>`);
   }
 
@@ -185,9 +183,12 @@ export class DataController {
       }
 
       const month = rows[0].month;
+      const yearlyRows = await this.dataService.getPersonalYearlySummary();
+
       const pdfBuffer = await this.pdfService.generateMonthlySummaryPdf(
         month,
         rows,
+        yearlyRows,
       );
 
       response.set({
@@ -327,9 +328,12 @@ export class DataController {
       }
 
       const month = rows[0].month;
+      const yearlyRows = await this.dataService.getSequentialYearlySummary();
+
       const pdfBuffer = await this.pdfService.generateSequentialSummaryPdf(
         month,
         rows,
+        yearlyRows,
       );
 
       response.set({

@@ -21,6 +21,13 @@ export interface SequentialSummaryRow {
   traineeName: string;
 }
 
+export interface YearlySummaryRow {
+  coachName: string;
+  year: string;
+  totalAttendees: number;
+  totalSessions: number;
+}
+
 @Injectable()
 export class PdfService {
   private fontPath = path.join(
@@ -34,9 +41,129 @@ export class PdfService {
     "NotoSansTC-Bold.ttf",
   );
 
+  private drawYearlySummaryPage(
+    pdfDocument: InstanceType<typeof PDFDocument>,
+    title: string,
+    year: string,
+    yearlyRows: YearlySummaryRow[],
+  ): void {
+    const tableLeft = 50;
+    const totalWidth = pdfDocument.page.width - tableLeft * 2;
+    const headers = ["教練", "年度上課人次", "年度上課次數"];
+    const colWidths = [
+      totalWidth * 0.34,
+      totalWidth * 0.33,
+      totalWidth * 0.33,
+    ];
+    const lineHeight = 16;
+    const cellPadding = 7;
+    const headerHeight = 30;
+
+    pdfDocument
+      .font("NotoSansTC-Bold")
+      .fontSize(22)
+      .fillColor("#000000")
+      .text(`${year} 年度總結 — ${title}`, { align: "center" });
+    pdfDocument.moveDown(1);
+
+    let headerY = pdfDocument.y;
+    this.drawTableHeader(
+      pdfDocument,
+      tableLeft,
+      headerY,
+      colWidths,
+      headers,
+      totalWidth,
+      headerHeight,
+    );
+    headerY = pdfDocument.y;
+
+    pdfDocument.font("NotoSansTC").fillColor("#000000").fontSize(13);
+
+    let grandTotalAttendees = 0;
+    let grandTotalSessions = 0;
+
+    yearlyRows.forEach((row, index) => {
+      const rowHeight = lineHeight + cellPadding * 2;
+
+      if (headerY + rowHeight > pdfDocument.page.height - 120) {
+        pdfDocument.addPage();
+        headerY = 50;
+        this.drawTableHeader(
+          pdfDocument,
+          tableLeft,
+          headerY,
+          colWidths,
+          headers,
+          totalWidth,
+          headerHeight,
+        );
+        headerY = pdfDocument.y;
+        pdfDocument.font("NotoSansTC").fillColor("#000000").fontSize(13);
+      }
+
+      if (index % 2 === 0) {
+        pdfDocument
+          .rect(tableLeft, headerY, totalWidth, rowHeight)
+          .fill("#f5f5f5");
+        pdfDocument.fillColor("#000000");
+      }
+
+      const textY = headerY + (rowHeight - lineHeight) / 2;
+      pdfDocument.text(row.coachName, tableLeft + 8, textY, {
+        width: colWidths[0] - 16,
+        align: "center",
+      });
+      pdfDocument.text(
+        String(row.totalAttendees),
+        tableLeft + colWidths[0] + 8,
+        textY,
+        {
+          width: colWidths[1] - 16,
+          align: "center",
+        },
+      );
+      pdfDocument.text(
+        String(row.totalSessions),
+        tableLeft + colWidths[0] + colWidths[1] + 8,
+        textY,
+        {
+          width: colWidths[2] - 16,
+          align: "center",
+        },
+      );
+
+      grandTotalAttendees += row.totalAttendees;
+      grandTotalSessions += row.totalSessions;
+      headerY += rowHeight;
+    });
+
+    // 合計列
+    headerY += 10;
+    if (headerY + 40 > pdfDocument.page.height - 50) {
+      pdfDocument.addPage();
+      headerY = 50;
+    }
+    pdfDocument.rect(tableLeft, headerY, totalWidth, 36).fill("#e8f4fd");
+    pdfDocument
+      .font("NotoSansTC-Bold")
+      .fontSize(14)
+      .fillColor("#333333")
+      .text(
+        `合計：上課人次 ${grandTotalAttendees} ／上課次數 ${grandTotalSessions}`,
+        tableLeft,
+        headerY + 9,
+        {
+          width: totalWidth,
+          align: "center",
+        },
+      );
+  }
+
   async generateMonthlySummaryPdf(
     month: string,
     rows: MonthlySummaryRow[],
+    yearlyRows: YearlySummaryRow[],
   ): Promise<Buffer> {
     return new Promise((resolve, reject) => {
       const pdfDocument = new PDFDocument({ size: "A4", margin: 50 });
@@ -49,6 +176,17 @@ export class PdfService {
       pdfDocument.registerFont("NotoSansTC", this.fontPath);
       pdfDocument.registerFont("NotoSansTC-Bold", this.fontBoldPath);
       pdfDocument.font("NotoSansTC");
+
+      // 年度總結首頁
+      if (yearlyRows.length > 0) {
+        const year = month.split("-")[0];
+        this.drawYearlySummaryPage(
+          pdfDocument,
+          "個人教練計畫",
+          year,
+          yearlyRows,
+        );
+      }
 
       // 依教練分組
       const grouped = new Map<string, MonthlySummaryRow[]>();
@@ -71,7 +209,7 @@ export class PdfService {
       const cellPadding = 7;
       const headerHeight = 30;
 
-      let isFirstPage = true;
+      let isFirstPage = yearlyRows.length === 0;
 
       for (const [coachName, coachRows] of grouped) {
         if (!isFirstPage) {
@@ -198,6 +336,7 @@ export class PdfService {
   async generateSequentialSummaryPdf(
     month: string,
     rows: SequentialSummaryRow[],
+    yearlyRows: YearlySummaryRow[],
   ): Promise<Buffer> {
     return new Promise((resolve, reject) => {
       const pdfDocument = new PDFDocument({ size: "A4", margin: 50 });
@@ -210,6 +349,12 @@ export class PdfService {
       pdfDocument.registerFont("NotoSansTC", this.fontPath);
       pdfDocument.registerFont("NotoSansTC-Bold", this.fontBoldPath);
       pdfDocument.font("NotoSansTC");
+
+      // 年度總結首頁
+      if (yearlyRows.length > 0) {
+        const year = month.split("-")[0];
+        this.drawYearlySummaryPage(pdfDocument, "團體課程", year, yearlyRows);
+      }
 
       // 依課程分組，再依日期分組
       const courseMap = new Map<
@@ -244,7 +389,7 @@ export class PdfService {
       const cellPadding = 7;
       const headerHeight = 30;
 
-      let isFirstPage = true;
+      let isFirstPage = yearlyRows.length === 0;
 
       for (const [courseName, course] of courseMap) {
         if (!isFirstPage) {
