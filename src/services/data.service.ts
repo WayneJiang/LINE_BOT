@@ -746,6 +746,67 @@ export class DataService {
     }
   }
 
+  async getCoachYearlySummary(coachId: number): Promise<{
+    personal: { year: string; totalAttendees: number; totalSessions: number }[];
+    sequential: { year: string; totalAttendees: number; totalSessions: number }[];
+  }> {
+    try {
+      const [personal, sequential] = await Promise.all([
+        this.trainingPlanRepository.query(
+          `
+          SELECT
+            TO_CHAR(DATE_TRUNC('year', r."createdDate"), 'YYYY') AS "year",
+            COUNT(DISTINCT tp.trainee)::int AS "totalAttendees",
+            COUNT(r.id)::int AS "totalSessions"
+          FROM "TrainingPlan" tp
+          INNER JOIN "TrainingRecord" r ON r."trainingPlan" = tp.id
+          WHERE tp.coach = $1
+            AND tp."planType" IN ('Personal', 'FlexiblePersonal')
+            AND r."deletedDate" IS NULL
+            AND tp."deletedDate" IS NULL
+          GROUP BY DATE_TRUNC('year', r."createdDate")
+          ORDER BY "year" DESC
+          `,
+          [coachId],
+        ),
+        this.trainingRecordRepository.query(
+          `
+          SELECT
+            TO_CHAR(DATE_TRUNC('year', r."createdDate"), 'YYYY') AS "year",
+            COUNT(DISTINCT r.trainee)::int AS "totalAttendees",
+            COUNT(DISTINCT DATE_TRUNC('day', r."createdDate") || '-' || r."openingCourse")::int AS "totalSessions"
+          FROM "TrainingRecord" r
+          INNER JOIN "TrainingPlan" tp ON tp.id = r."trainingPlan"
+          INNER JOIN "OpeningCourse" oc ON oc.id = r."openingCourse"
+          WHERE oc.coach = $1
+            AND tp."planType" = 'Sequential'
+            AND r."deletedDate" IS NULL
+            AND tp."deletedDate" IS NULL
+          GROUP BY DATE_TRUNC('year', r."createdDate")
+          ORDER BY "year" DESC
+          `,
+          [coachId],
+        ),
+      ]);
+
+      return {
+        personal: personal.map((r) => ({
+          year: r.year,
+          totalAttendees: Number(r.totalAttendees),
+          totalSessions: Number(r.totalSessions),
+        })),
+        sequential: sequential.map((r) => ({
+          year: r.year,
+          totalAttendees: Number(r.totalAttendees),
+          totalSessions: Number(r.totalSessions),
+        })),
+      };
+    } catch (error) {
+      console.error("查詢教練年度總結時發生錯誤:", error);
+      return { personal: [], sequential: [] };
+    }
+  }
+
   async getSequentialYearlySummary(): Promise<
     {
       coachName: string;

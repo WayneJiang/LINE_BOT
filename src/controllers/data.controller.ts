@@ -78,6 +78,11 @@ export class DataController {
     return this.dataService.updateCoach(param.id, body);
   }
 
+  @Get("coach/:id/yearlySummary")
+  async getCoachYearlySummary(@Param() param: IdDto) {
+    return this.dataService.getCoachYearlySummary(param.id);
+  }
+
   @Get("trainees")
   async getTrainees(): Promise<Trainee[]> {
     return this.dataService.getTrainees();
