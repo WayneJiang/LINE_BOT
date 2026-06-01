@@ -597,15 +597,16 @@ export class DataService {
     }[]
   > {
     try {
+      // createdDate 以 UTC 儲存，先轉成台北時區再格式化/分組/篩選，避免跨日邊界歸錯月份
+      const localCreated = `(trainingRecord."createdDate" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Taipei')`;
+      const lastMonth = `DATE_TRUNC('month', (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Taipei') - INTERVAL '1 month')`;
       // 查詢個人教練計畫的上月簽到摘要，含簽到日期
       const results = await this.trainingPlanRepository
         .createQueryBuilder("trainingPlan")
         .innerJoin("trainingPlan.coach", "coach")
         .innerJoin("trainingPlan.trainee", "trainee")
         .innerJoin("trainingPlan.trainingRecord", "trainingRecord")
-        .where(
-          "DATE_TRUNC('month', trainingRecord.createdDate) = DATE_TRUNC('month', CURRENT_DATE - INTERVAL '1 month')",
-        )
+        .where(`DATE_TRUNC('month', ${localCreated}) = ${lastMonth}`)
         .andWhere("trainingPlan.planType IN (:...planTypes)", {
           planTypes: [PlanType.Personal, PlanType.FlexiblePersonal],
         })
@@ -613,19 +614,19 @@ export class DataService {
         .addSelect("trainee.name", "traineeName")
         .addSelect("trainingPlan.planType", "planType")
         .addSelect(
-          "TO_CHAR(DATE_TRUNC('month', trainingRecord.createdDate), 'YYYY-MM')",
+          `TO_CHAR(DATE_TRUNC('month', ${localCreated}), 'YYYY-MM')`,
           "month",
         )
         .addSelect("trainingPlan.quota", "quota")
         .addSelect("COUNT(trainingRecord.id)", "checkinCount")
         .addSelect(
-          "STRING_AGG(TO_CHAR(trainingRecord.createdDate, 'MM/DD HH24:MI'), CHR(10) ORDER BY trainingRecord.createdDate)",
+          `STRING_AGG(TO_CHAR(${localCreated}, 'MM/DD HH24:MI'), CHR(10) ORDER BY ${localCreated})`,
           "checkinDates",
         )
         .groupBy("coach.name")
         .addGroupBy("trainee.name")
         .addGroupBy("trainingPlan.planType")
-        .addGroupBy("DATE_TRUNC('month', trainingRecord.createdDate)")
+        .addGroupBy(`DATE_TRUNC('month', ${localCreated})`)
         .addGroupBy("trainingPlan.quota")
         .orderBy("coach.name", "ASC")
         .addOrderBy("trainee.name", "ASC")
@@ -667,15 +668,16 @@ export class DataService {
     };
 
     try {
+      // createdDate 以 UTC 儲存，先轉成台北時區再格式化/分組/篩選，避免跨日邊界歸錯月份
+      const localCreated = `(record."createdDate" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Taipei')`;
+      const lastMonth = `DATE_TRUNC('month', (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Taipei') - INTERVAL '1 month')`;
       const results = await this.trainingRecordRepository
         .createQueryBuilder("record")
         .innerJoin("record.trainingPlan", "plan")
         .innerJoin("record.trainee", "trainee")
         .innerJoin("record.openingCourse", "course")
         .innerJoin("course.coach", "coach")
-        .where(
-          "DATE_TRUNC('month', record.createdDate) = DATE_TRUNC('month', CURRENT_DATE - INTERVAL '1 month')",
-        )
+        .where(`DATE_TRUNC('month', ${localCreated}) = ${lastMonth}`)
         .andWhere("plan.planType = :planType", {
           planType: PlanType.Sequential,
         })
@@ -685,12 +687,12 @@ export class DataService {
         .addSelect("course.end", "courseEnd")
         .addSelect("coach.name", "coachName")
         .addSelect(
-          "TO_CHAR(DATE_TRUNC('month', record.createdDate), 'YYYY-MM')",
+          `TO_CHAR(DATE_TRUNC('month', ${localCreated}), 'YYYY-MM')`,
           "month",
         )
-        .addSelect("TO_CHAR(record.createdDate, 'MM/DD')", "date")
+        .addSelect(`TO_CHAR(${localCreated}, 'MM/DD')`, "date")
         .addSelect("trainee.name", "traineeName")
-        .orderBy("TO_CHAR(record.createdDate, 'MM/DD')", "ASC")
+        .orderBy(`TO_CHAR(${localCreated}, 'MM/DD')`, "ASC")
         .addOrderBy("course.name", "ASC")
         .addOrderBy("trainee.name", "ASC")
         .getRawMany<SequentialSummaryRaw>();
@@ -718,19 +720,20 @@ export class DataService {
     }[]
   > {
     try {
+      // createdDate 以 UTC 儲存，先轉成台北時區再分組/篩選
       const results = await this.trainingPlanRepository.query(`
         SELECT
           coach.name AS "coachName",
-          TO_CHAR(DATE_TRUNC('year', r."createdDate"), 'YYYY') AS "year",
+          TO_CHAR(DATE_TRUNC('year', r."createdDate" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Taipei'), 'YYYY') AS "year",
           COUNT(DISTINCT tp.trainee)::int AS "totalAttendees",
           COUNT(r.id)::int AS "totalSessions"
         FROM "TrainingPlan" tp
         INNER JOIN "Coach" coach ON coach.id = tp.coach
         INNER JOIN "TrainingRecord" r ON r."trainingPlan" = tp.id
-        WHERE r."createdDate" >= DATE_TRUNC('year', CURRENT_DATE - INTERVAL '1 month')
-          AND r."createdDate" < DATE_TRUNC('month', CURRENT_DATE)
+        WHERE (r."createdDate" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Taipei') >= DATE_TRUNC('year', (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Taipei') - INTERVAL '1 month')
+          AND (r."createdDate" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Taipei') < DATE_TRUNC('month', (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Taipei'))
           AND tp."planType" IN ('Personal', 'FlexiblePersonal')
-        GROUP BY coach.name, DATE_TRUNC('year', r."createdDate")
+        GROUP BY coach.name, DATE_TRUNC('year', r."createdDate" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Taipei')
         ORDER BY coach.name ASC
       `);
 
@@ -755,7 +758,7 @@ export class DataService {
         this.trainingPlanRepository.query(
           `
           SELECT
-            TO_CHAR(DATE_TRUNC('year', r."createdDate"), 'YYYY') AS "year",
+            TO_CHAR(DATE_TRUNC('year', r."createdDate" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Taipei'), 'YYYY') AS "year",
             COUNT(DISTINCT tp.trainee)::int AS "totalAttendees",
             COUNT(r.id)::int AS "totalSessions"
           FROM "TrainingPlan" tp
@@ -764,7 +767,7 @@ export class DataService {
             AND tp."planType" IN ('Personal', 'FlexiblePersonal')
             AND r."deletedDate" IS NULL
             AND tp."deletedDate" IS NULL
-          GROUP BY DATE_TRUNC('year', r."createdDate")
+          GROUP BY DATE_TRUNC('year', r."createdDate" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Taipei')
           ORDER BY "year" DESC
           `,
           [coachId],
@@ -772,9 +775,9 @@ export class DataService {
         this.trainingRecordRepository.query(
           `
           SELECT
-            TO_CHAR(DATE_TRUNC('year', r."createdDate"), 'YYYY') AS "year",
+            TO_CHAR(DATE_TRUNC('year', r."createdDate" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Taipei'), 'YYYY') AS "year",
             COUNT(DISTINCT r.trainee)::int AS "totalAttendees",
-            COUNT(DISTINCT DATE_TRUNC('day', r."createdDate") || '-' || r."openingCourse")::int AS "totalSessions"
+            COUNT(DISTINCT DATE_TRUNC('day', r."createdDate" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Taipei') || '-' || r."openingCourse")::int AS "totalSessions"
           FROM "TrainingRecord" r
           INNER JOIN "TrainingPlan" tp ON tp.id = r."trainingPlan"
           INNER JOIN "OpeningCourse" oc ON oc.id = r."openingCourse"
@@ -782,7 +785,7 @@ export class DataService {
             AND tp."planType" = 'Sequential'
             AND r."deletedDate" IS NULL
             AND tp."deletedDate" IS NULL
-          GROUP BY DATE_TRUNC('year', r."createdDate")
+          GROUP BY DATE_TRUNC('year', r."createdDate" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Taipei')
           ORDER BY "year" DESC
           `,
           [coachId],
@@ -816,20 +819,21 @@ export class DataService {
     }[]
   > {
     try {
+      // createdDate 以 UTC 儲存，先轉成台北時區再分組/篩選
       const results = await this.trainingRecordRepository.query(`
         SELECT
           coach.name AS "coachName",
-          TO_CHAR(DATE_TRUNC('year', r."createdDate"), 'YYYY') AS "year",
+          TO_CHAR(DATE_TRUNC('year', r."createdDate" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Taipei'), 'YYYY') AS "year",
           COUNT(DISTINCT r.trainee)::int AS "totalAttendees",
-          COUNT(DISTINCT DATE_TRUNC('day', r."createdDate") || '-' || r."openingCourse")::int AS "totalSessions"
+          COUNT(DISTINCT DATE_TRUNC('day', r."createdDate" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Taipei') || '-' || r."openingCourse")::int AS "totalSessions"
         FROM "TrainingRecord" r
         INNER JOIN "TrainingPlan" tp ON tp.id = r."trainingPlan"
         INNER JOIN "OpeningCourse" oc ON oc.id = r."openingCourse"
         INNER JOIN "Coach" coach ON coach.id = oc.coach
-        WHERE r."createdDate" >= DATE_TRUNC('year', CURRENT_DATE - INTERVAL '1 month')
-          AND r."createdDate" < DATE_TRUNC('month', CURRENT_DATE)
+        WHERE (r."createdDate" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Taipei') >= DATE_TRUNC('year', (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Taipei') - INTERVAL '1 month')
+          AND (r."createdDate" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Taipei') < DATE_TRUNC('month', (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Taipei'))
           AND tp."planType" = 'Sequential'
-        GROUP BY coach.name, DATE_TRUNC('year', r."createdDate")
+        GROUP BY coach.name, DATE_TRUNC('year', r."createdDate" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Taipei')
         ORDER BY coach.name ASC
       `);
 
