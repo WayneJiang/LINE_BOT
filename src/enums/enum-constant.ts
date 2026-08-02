@@ -5,10 +5,10 @@ export enum Gender {
 
 export enum PlanType {
   None = "None",
-  Personal = "Personal",
-  FlexiblePersonal = "FlexiblePersonal",
-  Block = "Block",
-  Sequential = "Sequential",
+  PrivateTraining = "PrivateTraining",
+  FlexPrivate = "FlexPrivate",
+  SemiPrivate = "SemiPrivate",
+  GroupFitness = "GroupFitness",
 }
 
 export enum DayOfWeek {

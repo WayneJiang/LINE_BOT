@@ -23,8 +23,9 @@ export class TrainingPlanDto {
 
   @ValidateIf(
     (body: TrainingPlanDto) =>
-      body.planType == PlanType.Personal ||
-      body.planType == PlanType.Sequential,
+      body.planType == PlanType.PrivateTraining ||
+      body.planType == PlanType.SemiPrivate ||
+      body.planType == PlanType.GroupFitness,
   )
   @IsArray()
   @IsNotEmpty()

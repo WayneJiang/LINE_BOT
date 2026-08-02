@@ -77,7 +77,7 @@ export class LineService {
           });
 
           if (trainee) {
-            const personalAndBlockPlans = await this.trainingPlanRepository
+            const privateTrainingPlans = await this.trainingPlanRepository
               .createQueryBuilder("trainingPlan")
               .leftJoinAndSelect("trainingPlan.coach", "coach")
               .leftJoin(
@@ -90,9 +90,9 @@ export class LineService {
               })
               .andWhere("trainingPlan.planType IN (:...planTypes)", {
                 planTypes: [
-                  PlanType.Personal,
-                  PlanType.FlexiblePersonal,
-                  PlanType.Block,
+                  PlanType.PrivateTraining,
+                  PlanType.FlexPrivate,
+                  PlanType.SemiPrivate,
                 ],
               })
               .groupBy("trainingPlan.id, coach.name")
@@ -118,7 +118,7 @@ export class LineService {
             ];
             const today = dayOfWeekMap[new Date().getDay()];
 
-            const sequentialPlans = await this.trainingPlanRepository
+            const groupFitnessPlans = await this.trainingPlanRepository
               .createQueryBuilder("trainingPlan")
               .leftJoin("OpeningCourse", "openingCourse", "1=1")
               .leftJoin("Coach", "coach", "openingCourse.coach = coach.id")
@@ -131,7 +131,7 @@ export class LineService {
                 traineeId: trainee.id,
               })
               .andWhere("trainingPlan.planType = :planType", {
-                planType: PlanType.Sequential,
+                planType: PlanType.GroupFitness,
               })
               .andWhere("openingCourse.dayOfWeek = :today", {
                 today,
@@ -152,8 +152,8 @@ export class LineService {
               .getRawMany<AvailablePlanRaw>();
 
             const allAvailablePlans = [
-              ...personalAndBlockPlans,
-              ...sequentialPlans,
+              ...privateTrainingPlans,
+              ...groupFitnessPlans,
             ];
 
             allAvailablePlans.forEach((plan) => {
@@ -172,7 +172,7 @@ export class LineService {
                       size: "xl",
                       color: "#0080FF",
                       text:
-                        plan.planType === PlanType.Sequential
+                        plan.planType === PlanType.GroupFitness
                           ? `${this.planTypeToText(plan.planType)} ${plan.start}~${plan.end}`
                           : this.planTypeToText(plan.planType),
                       wrap: true,
@@ -648,76 +648,13 @@ export class LineService {
           return;
         }
 
-        // 如果 TrainingPlan 的 planType 是 BLOCK，為所有相同時段、相同教練的夥伴都新增一筆 TrainingRecord
-        if (trainingPlan.planType === PlanType.Block) {
-          // 查詢所有相同時段、相同教練的 Block 訓練計畫
-          const currentHour = dayjs().tz("Asia/Taipei").format("HH:mm");
-          const currentDayOfWeek = dayjs().tz("Asia/Taipei").format("dddd");
-
-          const blockTrainingPlans = await this.trainingPlanRepository
-            .createQueryBuilder("trainingPlan")
-            .leftJoinAndSelect("trainingPlan.trainee", "trainee")
-            .leftJoinAndSelect("trainingPlan.coach", "coach")
-            .leftJoinAndSelect(
-              "trainingPlan.trainingTimeSlot",
-              "trainingTimeSlot",
-            )
-            .where("trainingPlan.planType = :planType", {
-              planType: PlanType.Block,
-            })
-            .andWhere("coach.id = :coachId", { coachId: trainingPlan.coach.id })
-            .andWhere("trainingTimeSlot.dayOfWeek = :dayOfWeek", {
-              dayOfWeek: currentDayOfWeek,
-            })
-            .andWhere("trainingTimeSlot.start <= :currentHour", {
-              currentHour: currentHour,
-            })
-            .andWhere("trainingTimeSlot.end > :currentHour", {
-              currentHour: currentHour,
-            })
-            .getMany();
-
-          // 為所有找到的 Block 訓練計畫建立 TrainingRecord
-          for (const blockPlan of blockTrainingPlans) {
-            // 確保 trainee 和 coach 都有載入
-            if (!blockPlan.trainee || !blockPlan.coach) {
-              continue;
-            }
-
-            // 檢查該學員當天是否已經簽到過這個訓練計畫
-            const existingRecord = await this.trainingRecordRepository
-              .createQueryBuilder("trainingRecord")
-              .leftJoinAndSelect("trainingRecord.trainee", "trainee")
-              .leftJoinAndSelect("trainingRecord.trainingPlan", "trainingPlan")
-              .where("trainee.id = :traineeId", {
-                traineeId: blockPlan.trainee.id,
-              })
-              .andWhere("trainingPlan.id = :planId", { planId: blockPlan.id })
-              .andWhere("DATE(trainingRecord.createdDate) = DATE(:today)", {
-                today: dayjs().startOf("day").toDate(),
-              })
-              .getOne();
-
-            // 如果該學員當天還沒有簽到過，才建立新的簽到記錄
-            if (!existingRecord) {
-              await this.trainingRecordRepository.save(
-                this.trainingRecordRepository.create({
-                  trainee: blockPlan.trainee,
-                  trainingPlan: blockPlan,
-                }),
-              );
-            }
-          }
-        } else {
-          // 原有的個人簽到邏輯
-          await this.trainingRecordRepository.save(
-            this.trainingRecordRepository.create({
-              trainee: trainee,
-              trainingPlan: trainingPlan,
-              openingCourse: openingCourse,
-            }),
-          );
-        }
+        await this.trainingRecordRepository.save(
+          this.trainingRecordRepository.create({
+            trainee: trainee,
+            trainingPlan: trainingPlan,
+            openingCourse: openingCourse,
+          }),
+        );
 
         // 計算已使用的 quota
         const usedQuota = await this.trainingRecordRepository.count({
@@ -976,16 +913,18 @@ export class LineService {
     });
   }
 
-  private planTypeToText(planType: PlanType) {
+  private planTypeToText(planType: PlanType): string {
     switch (planType) {
-      case PlanType.Personal:
+      case PlanType.PrivateTraining:
         return "個人教練";
-      case PlanType.FlexiblePersonal:
+      case PlanType.FlexPrivate:
         return "個人彈性";
-      // case PlanType.Block:
-      //   return "團體課程";
-      case PlanType.Sequential:
+      case PlanType.SemiPrivate:
+        return "個人小班";
+      case PlanType.GroupFitness:
         return "團體課程";
+      default:
+        return "未分類課程";
     }
   }
 }

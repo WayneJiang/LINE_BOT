@@ -172,13 +172,13 @@ export class DataController {
   @Get("monthlySummary")
   getMonthlySummary(@Res() res: Response): void {
     res.type("html").send(`<!DOCTYPE html><html><body>
-<iframe src="/monthlySummary/personal" style="display:none"></iframe>
-<iframe src="/monthlySummary/sequential" style="display:none"></iframe>
+<iframe src="/monthlySummary/privateTraining" style="display:none"></iframe>
+<iframe src="/monthlySummary/groupFitness" style="display:none"></iframe>
 </body></html>`);
   }
 
-  @Get("monthlySummary/personal")
-  async getPersonalSummary(@Res() response: Response): Promise<void> {
+  @Get("monthlySummary/privateTraining")
+  async getPrivateTrainingSummary(@Res() response: Response): Promise<void> {
     try {
       const rows = await this.dataService.getMonthlySummary();
 
@@ -188,7 +188,8 @@ export class DataController {
       }
 
       const month = rows[0].month;
-      const yearlyRows = await this.dataService.getPersonalYearlySummary();
+      const yearlyRows =
+        await this.dataService.getPrivateTrainingYearlySummary();
 
       const pdfBuffer = await this.pdfService.generateMonthlySummaryPdf(
         month,
@@ -198,7 +199,7 @@ export class DataController {
 
       response.set({
         "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="${month}_personal.pdf"; filename*=UTF-8''${encodeURIComponent(`${month}_個人計畫簽到統計.pdf`)}`,
+        "Content-Disposition": `attachment; filename="${month}_privateTraining.pdf"; filename*=UTF-8''${encodeURIComponent(`${month}_個人計畫簽到統計.pdf`)}`,
         "Content-Length": pdfBuffer.length,
       });
       response.end(pdfBuffer);
@@ -313,7 +314,11 @@ export class DataController {
 
       const { month, uploads } = result;
       const labels = uploads.map((upload) => upload.label).join("、");
-      response.json({ status: "ok", message: `已產生 ${month} ${labels}`, uploads });
+      response.json({
+        status: "ok",
+        message: `已產生 ${month} ${labels}`,
+        uploads,
+      });
     } catch (error: unknown) {
       const message =
         error instanceof Error ? error.message : JSON.stringify(error);
@@ -322,10 +327,10 @@ export class DataController {
     }
   }
 
-  @Get("monthlySummary/sequential")
-  async getSequentialSummary(@Res() response: Response): Promise<void> {
+  @Get("monthlySummary/groupFitness")
+  async getGroupFitnessSummary(@Res() response: Response): Promise<void> {
     try {
-      const rows = await this.dataService.getSequentialMonthlySummary();
+      const rows = await this.dataService.getGroupFitnessMonthlySummary();
 
       if (rows.length === 0) {
         response.json({ status: "ok", message: "無上月團體課程資料" });
@@ -333,9 +338,9 @@ export class DataController {
       }
 
       const month = rows[0].month;
-      const yearlyRows = await this.dataService.getSequentialYearlySummary();
+      const yearlyRows = await this.dataService.getGroupFitnessYearlySummary();
 
-      const pdfBuffer = await this.pdfService.generateSequentialSummaryPdf(
+      const pdfBuffer = await this.pdfService.generateGroupFitnessSummaryPdf(
         month,
         rows,
         yearlyRows,
@@ -343,7 +348,7 @@ export class DataController {
 
       response.set({
         "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="${month}_sequential_summary.pdf"; filename*=UTF-8''${encodeURIComponent(`${month}_團體課程簽到統計.pdf`)}`,
+        "Content-Disposition": `attachment; filename="${month}_groupFitness_summary.pdf"; filename*=UTF-8''${encodeURIComponent(`${month}_團體課程簽到統計.pdf`)}`,
         "Content-Length": pdfBuffer.length,
       });
       response.end(pdfBuffer);

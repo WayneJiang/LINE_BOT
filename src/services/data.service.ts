@@ -36,22 +36,44 @@ interface YearlySummaryRaw {
   totalCheckins: string;
 }
 
-interface SequentialYearlySummaryRaw {
+interface GroupFitnessYearlySummaryRaw {
   coachName: string;
   year: string;
   totalAttendees: string;
   totalSessions: string;
 }
 
-interface SequentialSummaryRaw {
+interface GroupFitnessSummaryRaw {
+  courseId: string | null;
+  courseName: string | null;
+  dayOfWeek: string | null;
+  courseStart: string | null;
+  courseEnd: string | null;
+  coachName: string | null;
+  planCoachName: string | null;
+  month: string;
+  date: string;
+  traineeName: string;
+}
+
+/**
+ * 課表順序（週一～週日）。不直接 ORDER BY dayOfWeek：
+ * 那是字串比較，會排成 Friday, Monday, Saturday…
+ */
+const DAY_OF_WEEK_ORDER =
+  `CASE "openingCourse"."dayOfWeek" ` +
+  `WHEN 'Monday' THEN 1 WHEN 'Tuesday' THEN 2 WHEN 'Wednesday' THEN 3 ` +
+  `WHEN 'Thursday' THEN 4 WHEN 'Friday' THEN 5 WHEN 'Saturday' THEN 6 ` +
+  `WHEN 'Sunday' THEN 7 ELSE 8 END`;
+
+interface GroupFitnessIdleCourseRaw {
+  courseId: string;
   courseName: string;
   dayOfWeek: string;
   courseStart: string;
   courseEnd: string;
-  coachName: string;
+  coachName: string | null;
   month: string;
-  date: string;
-  traineeName: string;
 }
 
 @Injectable()
@@ -254,18 +276,10 @@ export class DataService {
       const trainee = await this.traineeRepository.findOneBy({
         id: body.trainee,
       });
-      const coach =
-        body.planType === PlanType.Block
-          ? null
-          : await this.coachRepository.findOneBy({ id: body.coach });
+      const coach = await this.coachRepository.findOneBy({ id: body.coach });
       const editor = await this.coachRepository.findOneBy({ id: body.editor });
 
-      if (!trainee || !editor) {
-        return false;
-      }
-
-      // 如果是 Block 類型，coach 不需要驗證
-      if (body.planType !== PlanType.Block && !coach) {
+      if (!trainee || !editor || !coach) {
         return false;
       }
 
@@ -274,7 +288,7 @@ export class DataService {
         planType: body.planType,
         quota: body.quota,
         trainee: trainee,
-        coach: body.planType == PlanType.Block ? null : coach,
+        coach: coach,
         editor: editor,
       });
 
@@ -320,20 +334,14 @@ export class DataService {
       }
 
       // 驗證相關實體是否存在
-      const coach =
-        body.planType === PlanType.Block
-          ? null
-          : await this.coachRepository.findOne({ where: { id: body.coach } });
+      const coach = await this.coachRepository.findOne({
+        where: { id: body.coach },
+      });
       const editor = await this.coachRepository.findOne({
         where: { id: body.editor },
       });
 
-      if (!editor) {
-        return false;
-      }
-
-      // 如果是 Block 類型，coach 不需要驗證
-      if (body.planType !== PlanType.Block && !coach) {
+      if (!editor || !coach) {
         return false;
       }
 
@@ -343,7 +351,7 @@ export class DataService {
         {
           planType: body.planType,
           quota: body.quota,
-          coach: body.planType == PlanType.Block ? null : coach,
+          coach: coach,
           editor: editor,
         },
       );
@@ -610,7 +618,11 @@ export class DataService {
         .innerJoin("trainingPlan.trainingRecord", "trainingRecord")
         .where(`DATE_TRUNC('month', ${localCreated}) = ${lastMonth}`)
         .andWhere("trainingPlan.planType IN (:...planTypes)", {
-          planTypes: [PlanType.Personal, PlanType.FlexiblePersonal],
+          planTypes: [
+            PlanType.PrivateTraining,
+            PlanType.FlexPrivate,
+            PlanType.SemiPrivate,
+          ],
         })
         .select("coach.name", "coachName")
         .addSelect("trainee.name", "traineeName")
@@ -622,7 +634,7 @@ export class DataService {
         .addSelect("trainingPlan.quota", "quota")
         .addSelect("COUNT(trainingRecord.id)", "checkinCount")
         .addSelect(
-          `STRING_AGG(TO_CHAR(${localCreated}, 'MM/DD HH24:MI'), CHR(10) ORDER BY ${localCreated})`,
+          `STRING_AGG(TO_CHAR(${localCreated}, 'MM/DD'), CHR(10) ORDER BY ${localCreated})`,
           "checkinDates",
         )
         .groupBy("coach.name")
@@ -650,8 +662,12 @@ export class DataService {
     }
   }
 
-  async getSequentialMonthlySummary(): Promise<
+  /** 未指定 openingCourse 的簽到共用的課程代號，讓它們自成一頁而不是被丟掉 */
+  private static readonly UNASSIGNED_COURSE_ID = 0;
+
+  async getGroupFitnessMonthlySummary(): Promise<
     {
+      courseId: number;
       courseName: string;
       courseTime: string;
       coachName: string;
@@ -676,47 +692,125 @@ export class DataService {
       // 未加引號會被 PostgreSQL 折疊成小寫而找不到對應表
       const localCreated = `("trainingRecord"."createdDate" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Taipei')`;
       const lastMonth = `DATE_TRUNC('month', (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Taipei') - INTERVAL '1 month')`;
+      // openingCourse 一律用 leftJoin：簽到時漏選課程的紀錄照樣扣了學員額度，
+      // 用 innerJoin 會讓它們從報表上無聲消失，改為歸入「未指定課程」讓人看得到並補資料
       const results = await this.trainingRecordRepository
         .createQueryBuilder("trainingRecord")
         .innerJoin("trainingRecord.trainingPlan", "trainingPlan")
         .innerJoin("trainingRecord.trainee", "trainee")
-        .innerJoin("trainingRecord.openingCourse", "openingCourse")
-        .innerJoin("openingCourse.coach", "coach")
+        .leftJoin("trainingRecord.openingCourse", "openingCourse")
+        .leftJoin("openingCourse.coach", "coach")
+        .leftJoin("trainingPlan.coach", "planCoach")
         .where(`DATE_TRUNC('month', ${localCreated}) = ${lastMonth}`)
         .andWhere("trainingPlan.planType = :planType", {
-          planType: PlanType.Sequential,
+          planType: PlanType.GroupFitness,
         })
-        .select("openingCourse.name", "courseName")
+        .select("openingCourse.id", "courseId")
+        .addSelect("openingCourse.name", "courseName")
         .addSelect("openingCourse.dayOfWeek", "dayOfWeek")
         .addSelect("openingCourse.start", "courseStart")
         .addSelect("openingCourse.end", "courseEnd")
         .addSelect("coach.name", "coachName")
+        .addSelect("planCoach.name", "planCoachName")
         .addSelect(
           `TO_CHAR(DATE_TRUNC('month', ${localCreated}), 'YYYY-MM')`,
           "month",
         )
         .addSelect(`TO_CHAR(${localCreated}, 'MM/DD')`, "date")
         .addSelect("trainee.name", "traineeName")
-        .orderBy(`TO_CHAR(${localCreated}, 'MM/DD')`, "ASC")
-        .addOrderBy("openingCourse.name", "ASC")
+        // 這個順序同時決定 PDF 的頁序與列序：
+        // 先依週次、時段排出課表順序（課程頁的先後），同一堂課內部再依日期排（列的先後）。
+        // 同名課程可能有多個時段，需再依 id 分開，否則後續會被當成同一堂課
+        .orderBy(DAY_OF_WEEK_ORDER, "ASC")
+        .addOrderBy("openingCourse.start", "ASC")
+        .addOrderBy("openingCourse.id", "ASC")
+        .addOrderBy(`TO_CHAR(${localCreated}, 'MM/DD')`, "ASC")
         .addOrderBy("trainee.name", "ASC")
-        .getRawMany<SequentialSummaryRaw>();
+        .getRawMany<GroupFitnessSummaryRaw>();
 
-      return results.map((result) => ({
-        courseName: result.courseName,
-        courseTime: `${DAY_OF_WEEK_LABEL[result.dayOfWeek] || result.dayOfWeek} ${result.courseStart}-${result.courseEnd}`,
-        coachName: result.coachName,
+      const mapped = results.map((result) => ({
+        courseId: Number(result.courseId ?? DataService.UNASSIGNED_COURSE_ID),
+        courseName: result.courseName ?? "未指定課程",
+        courseTime: result.courseId
+          ? `${DAY_OF_WEEK_LABEL[result.dayOfWeek] || result.dayOfWeek} ${result.courseStart}-${result.courseEnd}`
+          : "",
+        // 沒有開課教練可循時，退而顯示計畫的負責教練，至少知道該找誰補資料
+        coachName: result.coachName ?? result.planCoachName ?? "未指定",
         month: result.month,
         date: result.date,
         traineeName: result.traineeName,
       }));
+
+      // 當月一個人都沒來的課程同樣要有一頁，否則報表看不出「有開課但沒人上」，
+      // 只會整堂消失。用 date/traineeName 留空的佔位列表示，PdfService 會印成 0 人次
+      const attendedCourseIds = new Set(
+        mapped
+          .filter((row) => row.courseId !== DataService.UNASSIGNED_COURSE_ID)
+          .map((row) => row.courseId),
+      );
+      const idleCourses = await this.openingCourseRepository
+        .createQueryBuilder("openingCourse")
+        .leftJoin("openingCourse.coach", "coach")
+        // 報表月之後才建立的課程不該回溯出現在當月報表
+        .where(
+          `("openingCourse"."createdDate" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Taipei') < ${lastMonth} + INTERVAL '1 month'`,
+        )
+        .select("openingCourse.id", "courseId")
+        .addSelect("openingCourse.name", "courseName")
+        .addSelect("openingCourse.dayOfWeek", "dayOfWeek")
+        .addSelect("openingCourse.start", "courseStart")
+        .addSelect("openingCourse.end", "courseEnd")
+        .addSelect("coach.name", "coachName")
+        .addSelect(`TO_CHAR(${lastMonth}, 'YYYY-MM')`, "month")
+        .orderBy(DAY_OF_WEEK_ORDER, "ASC")
+        .addOrderBy("openingCourse.start", "ASC")
+        .addOrderBy("openingCourse.id", "ASC")
+        .getRawMany<GroupFitnessIdleCourseRaw>();
+
+      const idleRows = idleCourses
+        .filter((raw) => !attendedCourseIds.has(Number(raw.courseId)))
+        .map((raw) => ({
+          courseId: Number(raw.courseId),
+          courseName: raw.courseName,
+          courseTime: `${DAY_OF_WEEK_LABEL[raw.dayOfWeek] || raw.dayOfWeek} ${raw.courseStart}-${raw.courseEnd}`,
+          coachName: raw.coachName ?? "未指定",
+          month: raw.month,
+          date: "",
+          traineeName: "",
+        }));
+
+      // idleCourses 查的是全部課程且已依週次、時段排序，索引即課表順序
+      const scheduleOrder = new Map<number, number>(
+        idleCourses.map((raw, index) => [Number(raw.courseId), index]),
+      );
+
+      // 有人上的課與沒人上的課要一起依課表排，不能把後者整批接在末尾，
+      // 否則週二的空堂會排到週六後面。sort 是穩定的，同一堂課內部維持 SQL 的日期順序
+      const scheduled = [
+        ...mapped.filter(
+          (row) => row.courseId !== DataService.UNASSIGNED_COURSE_ID,
+        ),
+        ...idleRows,
+      ].sort(
+        (a, b) =>
+          (scheduleOrder.get(a.courseId) ?? Number.MAX_SAFE_INTEGER) -
+          (scheduleOrder.get(b.courseId) ?? Number.MAX_SAFE_INTEGER),
+      );
+
+      // 「未指定課程」沒有時段可排，殿後
+      return [
+        ...scheduled,
+        ...mapped.filter(
+          (row) => row.courseId === DataService.UNASSIGNED_COURSE_ID,
+        ),
+      ];
     } catch (error) {
       console.error("查詢團體課程月度摘要時發生錯誤:", error);
       return [];
     }
   }
 
-  async getPersonalYearlySummary(): Promise<
+  async getPrivateTrainingYearlySummary(): Promise<
     {
       coachName: string;
       year: string;
@@ -726,6 +820,8 @@ export class DataService {
   > {
     try {
       // createdDate 以 UTC 儲存，先轉成台北時區再分組/篩選
+      // 軟刪除必須自己排除：raw SQL 不像 QueryBuilder 會自動補上 deletedDate IS NULL，
+      // 少了這兩行，年度總結頁會比同一份報表的月份明細多算已刪除的簽到
       const results = await this.trainingPlanRepository.query(`
         SELECT
           coach.name AS "coachName",
@@ -737,7 +833,9 @@ export class DataService {
         INNER JOIN "TrainingRecord" trainingRecord ON trainingRecord."trainingPlan" = trainingPlan.id
         WHERE (trainingRecord."createdDate" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Taipei') >= DATE_TRUNC('year', (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Taipei') - INTERVAL '1 month')
           AND (trainingRecord."createdDate" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Taipei') < DATE_TRUNC('month', (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Taipei'))
-          AND trainingPlan."planType" IN ('Personal', 'FlexiblePersonal')
+          AND trainingPlan."planType" IN ('PrivateTraining', 'FlexPrivate', 'SemiPrivate')
+          AND trainingRecord."deletedDate" IS NULL
+          AND trainingPlan."deletedDate" IS NULL
         GROUP BY coach.name, DATE_TRUNC('year', trainingRecord."createdDate" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Taipei')
         ORDER BY coach.name ASC
       `);
@@ -755,11 +853,19 @@ export class DataService {
   }
 
   async getCoachYearlySummary(coachId: number): Promise<{
-    personal: { year: string; totalAttendees: number; totalSessions: number }[];
-    sequential: { year: string; totalAttendees: number; totalSessions: number }[];
+    privateTraining: {
+      year: string;
+      totalAttendees: number;
+      totalSessions: number;
+    }[];
+    groupFitness: {
+      year: string;
+      totalAttendees: number;
+      totalSessions: number;
+    }[];
   }> {
     try {
-      const [personal, sequential] = await Promise.all([
+      const [privateTraining, groupFitness] = await Promise.all([
         this.trainingPlanRepository.query(
           `
           SELECT
@@ -769,7 +875,7 @@ export class DataService {
           FROM "TrainingPlan" trainingPlan
           INNER JOIN "TrainingRecord" trainingRecord ON trainingRecord."trainingPlan" = trainingPlan.id
           WHERE trainingPlan.coach = $1
-            AND trainingPlan."planType" IN ('Personal', 'FlexiblePersonal')
+            AND trainingPlan."planType" IN ('PrivateTraining', 'FlexPrivate', 'SemiPrivate')
             AND trainingRecord."deletedDate" IS NULL
             AND trainingPlan."deletedDate" IS NULL
           GROUP BY DATE_TRUNC('year', trainingRecord."createdDate" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Taipei')
@@ -787,7 +893,7 @@ export class DataService {
           INNER JOIN "TrainingPlan" trainingPlan ON trainingPlan.id = trainingRecord."trainingPlan"
           INNER JOIN "OpeningCourse" openingCourse ON openingCourse.id = trainingRecord."openingCourse"
           WHERE openingCourse.coach = $1
-            AND trainingPlan."planType" = 'Sequential'
+            AND trainingPlan."planType" = 'GroupFitness'
             AND trainingRecord."deletedDate" IS NULL
             AND trainingPlan."deletedDate" IS NULL
           GROUP BY DATE_TRUNC('year', trainingRecord."createdDate" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Taipei')
@@ -798,12 +904,12 @@ export class DataService {
       ]);
 
       return {
-        personal: personal.map((r) => ({
+        privateTraining: privateTraining.map((r) => ({
           year: r.year,
           totalAttendees: Number(r.totalAttendees),
           totalSessions: Number(r.totalSessions),
         })),
-        sequential: sequential.map((r) => ({
+        groupFitness: groupFitness.map((r) => ({
           year: r.year,
           totalAttendees: Number(r.totalAttendees),
           totalSessions: Number(r.totalSessions),
@@ -811,11 +917,11 @@ export class DataService {
       };
     } catch (error) {
       console.error("查詢教練年度總結時發生錯誤:", error);
-      return { personal: [], sequential: [] };
+      return { privateTraining: [], groupFitness: [] };
     }
   }
 
-  async getSequentialYearlySummary(): Promise<
+  async getGroupFitnessYearlySummary(): Promise<
     {
       coachName: string;
       year: string;
@@ -825,6 +931,8 @@ export class DataService {
   > {
     try {
       // createdDate 以 UTC 儲存，先轉成台北時區再分組/篩選
+      // 軟刪除必須自己排除：raw SQL 不像 QueryBuilder 會自動補上 deletedDate IS NULL，
+      // 少了這兩行，年度總結頁會比同一份報表的月份明細多算已刪除的簽到
       const results = await this.trainingRecordRepository.query(`
         SELECT
           coach.name AS "coachName",
@@ -837,7 +945,9 @@ export class DataService {
         INNER JOIN "Coach" coach ON coach.id = openingCourse.coach
         WHERE (trainingRecord."createdDate" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Taipei') >= DATE_TRUNC('year', (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Taipei') - INTERVAL '1 month')
           AND (trainingRecord."createdDate" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Taipei') < DATE_TRUNC('month', (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Taipei'))
-          AND trainingPlan."planType" = 'Sequential'
+          AND trainingPlan."planType" = 'GroupFitness'
+          AND trainingRecord."deletedDate" IS NULL
+          AND trainingPlan."deletedDate" IS NULL
         GROUP BY coach.name, DATE_TRUNC('year', trainingRecord."createdDate" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Taipei')
         ORDER BY coach.name ASC
       `);
@@ -858,26 +968,30 @@ export class DataService {
     month: string;
     uploads: { label: string; url: string }[];
   } | null> {
-    const [personalRows, sequentialRows, personalYearly, sequentialYearly] =
-      await Promise.all([
-        this.getMonthlySummary(),
-        this.getSequentialMonthlySummary(),
-        this.getPersonalYearlySummary(),
-        this.getSequentialYearlySummary(),
-      ]);
+    const [
+      privateTrainingRows,
+      groupFitnessRows,
+      privateTrainingYearly,
+      groupFitnessYearly,
+    ] = await Promise.all([
+      this.getMonthlySummary(),
+      this.getGroupFitnessMonthlySummary(),
+      this.getPrivateTrainingYearlySummary(),
+      this.getGroupFitnessYearlySummary(),
+    ]);
 
-    if (personalRows.length === 0 && sequentialRows.length === 0) {
+    if (privateTrainingRows.length === 0 && groupFitnessRows.length === 0) {
       return null;
     }
 
-    const month = personalRows[0]?.month || sequentialRows[0]?.month;
+    const month = privateTrainingRows[0]?.month || groupFitnessRows[0]?.month;
     const uploads: { label: string; url: string }[] = [];
 
-    if (personalRows.length > 0) {
+    if (privateTrainingRows.length > 0) {
       const pdf = await this.pdfService.generateMonthlySummaryPdf(
         month,
-        personalRows,
-        personalYearly,
+        privateTrainingRows,
+        privateTrainingYearly,
       );
       const { url } = await put(`${month}_個人計畫簽到統計.pdf`, pdf, {
         access: "public",
@@ -887,11 +1001,11 @@ export class DataService {
       uploads.push({ label: "個人計畫簽到統計", url });
     }
 
-    if (sequentialRows.length > 0) {
-      const pdf = await this.pdfService.generateSequentialSummaryPdf(
+    if (groupFitnessRows.length > 0) {
+      const pdf = await this.pdfService.generateGroupFitnessSummaryPdf(
         month,
-        sequentialRows,
-        sequentialYearly,
+        groupFitnessRows,
+        groupFitnessYearly,
       );
       const { url } = await put(`${month}_團體課程簽到統計.pdf`, pdf, {
         access: "public",
