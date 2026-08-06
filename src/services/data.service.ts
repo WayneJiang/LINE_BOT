@@ -276,10 +276,13 @@ export class DataService {
       const trainee = await this.traineeRepository.findOneBy({
         id: body.trainee,
       });
-      const coach = await this.coachRepository.findOneBy({ id: body.coach });
+      // 團體課程不指定教練，授課教練是看簽到紀錄掛的開課
+      const coach = body.coach
+        ? await this.coachRepository.findOneBy({ id: body.coach })
+        : null;
       const editor = await this.coachRepository.findOneBy({ id: body.editor });
 
-      if (!trainee || !editor || !coach) {
+      if (!trainee || !editor || (body.coach && !coach)) {
         return false;
       }
 
@@ -334,14 +337,17 @@ export class DataService {
       }
 
       // 驗證相關實體是否存在
-      const coach = await this.coachRepository.findOne({
-        where: { id: body.coach },
-      });
+      // 團體課程不指定教練，改成團體課程時也要一併清掉原本的教練
+      const coach = body.coach
+        ? await this.coachRepository.findOne({
+            where: { id: body.coach },
+          })
+        : null;
       const editor = await this.coachRepository.findOne({
         where: { id: body.editor },
       });
 
-      if (!editor || !coach) {
+      if (!editor || (body.coach && !coach)) {
         return false;
       }
 
@@ -441,11 +447,23 @@ export class DataService {
         return false;
       }
 
+      // 團體課程要一併掛上開課，教練歸屬才查得到
+      const openingCourse = body.openingCourse
+        ? await this.openingCourseRepository.findOneBy({
+            id: body.openingCourse,
+          })
+        : null;
+
+      if (body.openingCourse && !openingCourse) {
+        return false;
+      }
+
       // 建立訓練紀錄
       const trainingRecord = this.trainingRecordRepository.create({
         trainee: trainee,
         trainingPlan: trainingPlan,
         editor: editor,
+        openingCourse: openingCourse,
         createdDate: body.date || new Date(),
       });
 
@@ -481,6 +499,20 @@ export class DataService {
         return false;
       }
 
+      // 開課決定團體課程的授課教練：帶 id 就換綁、帶 null 就解除、沒帶則維持原狀
+      let openingCourse: OpeningCourse | null | undefined;
+      if (body.openingCourse === null) {
+        openingCourse = null;
+      } else if (body.openingCourse !== undefined) {
+        openingCourse = await this.openingCourseRepository.findOneBy({
+          id: body.openingCourse,
+        });
+
+        if (!openingCourse) {
+          return false;
+        }
+      }
+
       // 更新訓練紀錄
       await this.trainingRecordRepository.update(
         { id },
@@ -488,6 +520,9 @@ export class DataService {
           trainingPlan: trainingPlan,
           editor: editor,
           createdDate: body.date,
+          ...(openingCourse !== undefined
+            ? { openingCourse: openingCourse }
+            : {}),
         },
       );
 

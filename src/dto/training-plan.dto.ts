@@ -37,9 +37,11 @@ export class TrainingPlanDto {
   @Type(() => Number)
   trainee: number;
 
+  // 團體課程的授課教練掛在開課上，計畫層級不指定教練
+  @ValidateIf((body: TrainingPlanDto) => body.planType != PlanType.GroupFitness)
   @IsNumber()
   @Type(() => Number)
-  coach: number;
+  coach?: number;
 
   @IsNumber()
   @Type(() => Number)
