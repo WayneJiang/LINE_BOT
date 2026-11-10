@@ -408,7 +408,9 @@ export class DataService {
         .leftJoinAndSelect("trainingRecord.openingCourse", "openingCourse")
         .leftJoinAndSelect("openingCourse.coach", "openingCourseCoach")
         .where("trainingRecord.trainee = :trainee", { trainee: body.trainee })
-        .orderBy("trainingRecord.id", "DESC");
+        // 依簽到時間排序，補登的紀錄才會和同一天的紀錄排在一起；同時間再用 id 確保分頁穩定
+        .orderBy("trainingRecord.createdDate", "DESC")
+        .addOrderBy("trainingRecord.id", "DESC");
 
       // 取得總筆數
       const totalCount = await queryBuilder.getCount();
