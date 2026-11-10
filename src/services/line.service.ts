@@ -116,7 +116,8 @@ export class LineService {
               DayOfWeek.Friday,
               DayOfWeek.Saturday,
             ];
-            const today = dayOfWeekMap[new Date().getDay()];
+            // 伺服器跑在 UTC，要用台灣時間判斷星期，否則 00:00-08:00 會列出前一天的課
+            const today = dayOfWeekMap[dayjs().tz("Asia/Taipei").day()];
 
             const groupFitnessPlans = await this.trainingPlanRepository
               .createQueryBuilder("trainingPlan")
@@ -553,18 +554,87 @@ export class LineService {
               })
             : null;
 
-        // 檢查當天是否已經有這個 TrainingPlan 的 TrainingRecord
-        const today = dayjs().startOf("day").toDate();
+        const nowTaipei = dayjs().tz("Asia/Taipei");
 
+        // 簽到按鈕帶著課程 id，舊訊息裡的按鈕隔天按下去仍然有效，
+        // 必須確認這堂課就是今天（台灣時間）的課，否則會簽到別天的課程
+        const dayOfWeekMap = [
+          DayOfWeek.Sunday,
+          DayOfWeek.Monday,
+          DayOfWeek.Tuesday,
+          DayOfWeek.Wednesday,
+          DayOfWeek.Thursday,
+          DayOfWeek.Friday,
+          DayOfWeek.Saturday,
+        ];
+        if (
+          openingCourse &&
+          openingCourse.dayOfWeek !== dayOfWeekMap[nowTaipei.day()]
+        ) {
+          await this.messagingApiClient.replyMessage({
+            replyToken: replyToken,
+            messages: [
+              {
+                type: "flex",
+                altText: "簽到失敗",
+                contents: {
+                  type: "bubble",
+                  body: {
+                    type: "box",
+                    layout: "vertical",
+                    contents: [
+                      {
+                        type: "text",
+                        text: "簽到失敗",
+                        weight: "bold",
+                        size: "lg",
+                        align: "center",
+                        gravity: "center",
+                        color: "#ff0000",
+                      },
+                      {
+                        type: "separator",
+                        margin: "md",
+                      },
+                      {
+                        type: "text",
+                        text: "這不是今天的課程",
+                        weight: "bold",
+                        align: "center",
+                        gravity: "center",
+                        margin: "md",
+                        size: "lg",
+                      },
+                      {
+                        type: "text",
+                        text: "請重新點選「訓練簽到」",
+                        align: "center",
+                        gravity: "center",
+                        margin: "md",
+                        size: "sm",
+                        wrap: true,
+                      },
+                    ],
+                  },
+                },
+              },
+            ],
+          });
+          return;
+        }
+
+        // 檢查當天（台灣時間）是否已經有這個 TrainingPlan 的 TrainingRecord
+        // createdDate 以 UTC 儲存，要先轉成台灣時間再取日期
         const existingRecord = await this.trainingRecordRepository
           .createQueryBuilder("trainingRecord")
           .leftJoinAndSelect("trainingRecord.trainee", "trainee")
           .leftJoinAndSelect("trainingRecord.trainingPlan", "trainingPlan")
           .where("trainee.id = :traineeId", { traineeId: trainee.id })
           .andWhere("trainingPlan.id = :planId", { planId: trainingPlan.id })
-          .andWhere("DATE(trainingRecord.createdDate) = DATE(:today)", {
-            today,
-          })
+          .andWhere(
+            `("trainingRecord"."createdDate" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Taipei')::date = :today`,
+            { today: nowTaipei.format("YYYY-MM-DD") },
+          )
           .getOne();
 
         if (existingRecord && debut) {

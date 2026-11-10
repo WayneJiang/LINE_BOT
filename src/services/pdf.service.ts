@@ -1,6 +1,12 @@
 import { Injectable } from "@nestjs/common";
 import PDFDocument from "pdfkit";
 import * as path from "path";
+import dayjs from "dayjs";
+import utc from "dayjs/plugin/utc";
+import timezone from "dayjs/plugin/timezone";
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
 
 export interface MonthlySummaryRow {
   coachName: string;
@@ -335,15 +341,9 @@ export class PdfService {
   }
 
   private formatGeneratedAt(): string {
-    const now = new Date().toLocaleString("zh-TW", {
-      timeZone: "Asia/Taipei",
-      hour12: false,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    // 不用 toLocaleString：部分 Node/ICU 版本會在日期與時間之間插入特殊空白（如 U+202F），
+    // PDF 字型沒有這個字元會顯示成方框
+    const now = dayjs().tz("Asia/Taipei").format("YYYY/MM/DD HH:mm");
     return `產出時間 ${now}`;
   }
 
