@@ -521,7 +521,9 @@ export class LineService {
 
     const data = event.postback.data.split("/");
 
-    const debut = data[1] == "debut";
+    // debut：第一次按簽到；otherDay：已確認要簽別天的課；again：已確認要重複簽到
+    const action = data[1];
+    const debut = action == "debut" || action == "otherDay";
     const planId = Number(data[2]);
     const openingCourseId = data[3] ? Number(data[3]) : 0;
 
@@ -556,8 +558,17 @@ export class LineService {
 
         const nowTaipei = dayjs().tz("Asia/Taipei");
 
-        // 簽到按鈕帶著課程 id，舊訊息裡的按鈕隔天按下去仍然有效，
-        // 必須確認這堂課就是今天（台灣時間）的課，否則會簽到別天的課程
+        // 簽到按鈕帶著課程 id，舊訊息裡的按鈕隔天按下去仍然有效。
+        // 允許補簽別天的課，但先提醒並讓學員確認，避免誤按舊訊息簽到錯的課
+        const dayOfWeekLabel: Record<DayOfWeek, string> = {
+          [DayOfWeek.Monday]: "週一",
+          [DayOfWeek.Tuesday]: "週二",
+          [DayOfWeek.Wednesday]: "週三",
+          [DayOfWeek.Thursday]: "週四",
+          [DayOfWeek.Friday]: "週五",
+          [DayOfWeek.Saturday]: "週六",
+          [DayOfWeek.Sunday]: "週日",
+        };
         const dayOfWeekMap = [
           DayOfWeek.Sunday,
           DayOfWeek.Monday,
@@ -568,6 +579,7 @@ export class LineService {
           DayOfWeek.Saturday,
         ];
         if (
+          action == "debut" &&
           openingCourse &&
           openingCourse.dayOfWeek !== dayOfWeekMap[nowTaipei.day()]
         ) {
@@ -576,7 +588,7 @@ export class LineService {
             messages: [
               {
                 type: "flex",
-                altText: "簽到失敗",
+                altText: "非今日課程",
                 contents: {
                   type: "bubble",
                   body: {
@@ -585,7 +597,7 @@ export class LineService {
                     contents: [
                       {
                         type: "text",
-                        text: "簽到失敗",
+                        text: "提醒",
                         weight: "bold",
                         size: "lg",
                         align: "center",
@@ -599,20 +611,58 @@ export class LineService {
                       {
                         type: "text",
                         text: "這不是今天的課程",
+                        align: "center",
+                        gravity: "center",
+                        margin: "md",
+                        size: "xs",
+                      },
+                      {
+                        type: "text",
+                        text: `${openingCourse.name} ${dayOfWeekLabel[openingCourse.dayOfWeek] || openingCourse.dayOfWeek} ${openingCourse.start}~${openingCourse.end}`,
                         weight: "bold",
                         align: "center",
                         gravity: "center",
                         margin: "md",
                         size: "lg",
+                        color: "#019858",
+                        wrap: true,
                       },
                       {
                         type: "text",
-                        text: "請重新點選「訓練簽到」",
+                        text: "確定要簽到這堂課嗎？",
                         align: "center",
                         gravity: "center",
                         margin: "md",
                         size: "sm",
                         wrap: true,
+                      },
+                    ],
+                  },
+                  footer: {
+                    type: "box",
+                    layout: "vertical",
+                    spacing: "sm",
+                    contents: [
+                      {
+                        type: "button",
+                        style: "primary",
+                        height: "sm",
+                        color: "#FF2D2D",
+                        action: {
+                          type: "postback",
+                          label: "確定簽到",
+                          data: `/otherDay/${trainingPlan.id}/${openingCourseId}`,
+                        },
+                      },
+                      {
+                        type: "button",
+                        style: "secondary",
+                        height: "md",
+                        action: {
+                          type: "message",
+                          label: "重新選課",
+                          text: "訓練簽到",
+                        },
                       },
                     ],
                   },
