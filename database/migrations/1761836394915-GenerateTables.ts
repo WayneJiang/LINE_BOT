@@ -4,6 +4,13 @@ export class GenerateTables1761836394915 implements MigrationInterface {
     name = 'GenerateTables1761836394915'
 
     public async up(queryRunner: QueryRunner): Promise<void> {
+        // 原本這支 migration 沒有建立 enum 型別（正式 DB 當時已由 synchronize 建好），
+        // 全新資料庫會失敗，所以在這裡補上。PlanType 為當時的原始值，後續 migration 會再調整。
+        await queryRunner.query(`CREATE TYPE "public"."OpeningCourse_dayofweek_enum" AS ENUM('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday')`);
+        await queryRunner.query(`CREATE TYPE "public"."TrainingTimeSlot_dayofweek_enum" AS ENUM('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday')`);
+        await queryRunner.query(`CREATE TYPE "public"."Coach_coachtype_enum" AS ENUM('Founder', 'Partner', 'Team')`);
+        await queryRunner.query(`CREATE TYPE "public"."Trainee_gender_enum" AS ENUM('Male', 'Female')`);
+        await queryRunner.query(`CREATE TYPE "public"."TrainingPlan_plantype_enum" AS ENUM('None', 'Personal', 'Block', 'Sequential')`);
         await queryRunner.query(`CREATE TABLE "OpeningCourse" ("id" SERIAL NOT NULL, "name" character varying NOT NULL, "dayOfWeek" "public"."OpeningCourse_dayofweek_enum" NOT NULL DEFAULT 'Monday', "start" character varying NOT NULL, "end" character varying NOT NULL, "note" character varying NOT NULL DEFAULT '', "createdDate" TIMESTAMP NOT NULL DEFAULT now(), "updatedDate" TIMESTAMP NOT NULL DEFAULT now(), "deletedDate" TIMESTAMP, "coach" integer, CONSTRAINT "PK_bf07079649a538bbbe5c1aa24fe" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE TABLE "Coach" ("id" SERIAL NOT NULL, "socialId" character varying NOT NULL DEFAULT 'Ud519e05aed38a9bf1820a30313615cfb', "name" character varying NOT NULL, "coachType" "public"."Coach_coachtype_enum" NOT NULL DEFAULT 'Founder', "createdDate" TIMESTAMP NOT NULL DEFAULT now(), "updatedDate" TIMESTAMP NOT NULL DEFAULT now(), "deletedDate" TIMESTAMP, CONSTRAINT "unique_coach" UNIQUE ("id", "socialId"), CONSTRAINT "PK_bf604e12d74b449fc85d6391b4f" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE TABLE "TrainingRecord" ("id" SERIAL NOT NULL, "createdDate" TIMESTAMP NOT NULL DEFAULT now(), "updatedDate" TIMESTAMP NOT NULL DEFAULT now(), "deletedDate" TIMESTAMP, "trainee" integer, "trainingPlan" integer, "editor" integer, CONSTRAINT "PK_2e0270f72b9fd634a30841e1ae6" PRIMARY KEY ("id"))`);
@@ -35,6 +42,11 @@ export class GenerateTables1761836394915 implements MigrationInterface {
         await queryRunner.query(`DROP TABLE "TrainingRecord"`);
         await queryRunner.query(`DROP TABLE "Coach"`);
         await queryRunner.query(`DROP TABLE "OpeningCourse"`);
+        await queryRunner.query(`DROP TYPE "public"."TrainingPlan_plantype_enum"`);
+        await queryRunner.query(`DROP TYPE "public"."Trainee_gender_enum"`);
+        await queryRunner.query(`DROP TYPE "public"."Coach_coachtype_enum"`);
+        await queryRunner.query(`DROP TYPE "public"."TrainingTimeSlot_dayofweek_enum"`);
+        await queryRunner.query(`DROP TYPE "public"."OpeningCourse_dayofweek_enum"`);
     }
 
 }
