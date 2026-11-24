@@ -25,6 +25,8 @@ import { Coach } from "./entities/coach.entity";
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      // .env.local（本機開發用，不進 git）優先於 .env
+      envFilePath: [".env.local", ".env"],
     }),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
@@ -32,12 +34,12 @@ import { Coach } from "./entities/coach.entity";
       useFactory: (configService: ConfigService) => ({
         type: "postgres",
         host: configService.get<string>("POSTGRES_HOST"),
-        port: 5432,
+        port: Number(configService.get<string>("POSTGRES_PORT") ?? 5432),
         username: configService.get<string>("POSTGRES_USER"),
         password: configService.get<string>("POSTGRES_PASSWORD"),
         database: configService.get<string>("POSTGRES_DATABASE"),
         autoLoadEntities: true,
-        ssl: true,
+        ssl: configService.get<string>("DB_SSL") !== "false",
       }),
     }),
     TypeOrmModule.forFeature([

@@ -2,7 +2,8 @@ import * as dotenv from 'dotenv';
 import { DataSource } from 'typeorm';
 import { join } from 'path';
 
-dotenv.config();
+// .env.local（本機開發用，不進 git）優先於 .env
+dotenv.config({ path: ['.env.local', '.env'] });
 
 const dataSource = new DataSource({
     type: 'postgres',
@@ -11,9 +12,7 @@ const dataSource = new DataSource({
     migrations: [join(__dirname, './migrations/*.ts')],
     synchronize: false,
     logging: true,
-    ssl: {
-        rejectUnauthorized: false,
-    },
+    ssl: process.env.DB_SSL === 'false' ? false : { rejectUnauthorized: false },
 });
 
 export default dataSource;
