@@ -17,8 +17,10 @@ LINE Bot 後端，負責教練／學員資料、訓練計畫與簽到紀錄，�
 
 ```
 src/
-├── controllers/   # HTTP 路由（line、data）
-├── services/      # line.service、data.service、pdf.service
+├── config/        # LINE Messaging 環境變數讀取（新舊名稱相容）
+├── controllers/   # HTTP 路由（line、data、auth）
+├── middleware/    # LINE webhook 簽章驗證
+├── services/      # line.service、line-login.service、data.service、pdf.service
 ├── entities/      # TypeORM entity（Coach、Trainee、TrainingPlan、TrainingRecord…）
 ├── dto/           # 請求資料驗證
 ├── enums/         # 常數（方案類型等）
@@ -68,9 +70,15 @@ POSTGRES_PORT=5432
 POSTGRES_USER=dev
 POSTGRES_PASSWORD=dev
 POSTGRES_DATABASE=linebot_dev
-CHANNEL_SECRET=（建議用測試用 Messaging API channel）
-CHANNEL_ACCESS_TOKEN=（同上）
+LINE_MESSAGE_CHANNEL_SECRET=（建議用測試用 Messaging API channel）
+LINE_MESSAGE_CHANNEL_ACCESS_TOKEN=（同上）
+LINE_LOGIN_CHANNEL_ID=（測試用 LINE Login channel ID）
+LINE_LOGIN_SECRET=（同上）
+LINE_LOGIN_REDIRECT_URIS=http://localhost:5173/line-callback
+NODE_ENV=development
 ```
+
+`NODE_ENV=development` 只放在本機的 `.env.local`，正式環境不得設定（`development` / `test` 才允許 `localhost` 回呼網址）。
 
 `Managment_Web/.env.development.local`：
 
@@ -141,8 +149,10 @@ PG_IMAGE=postgres:18 ./scripts/pull-prod-db.sh
 
 ### LINE 相關
 
-- **Webhook（`POST /webhook`）**：LINE 連不到 localhost，用 `ngrok http 8000`，把 `https://xxxx.ngrok-free.app/webhook` 填到 LINE Developers 的 Webhook URL。
-- **LINE Login**：前端 redirect URI 是 `${window.location.origin}/line-callback`，需在 LINE Login channel 的 Callback URL 加上 `http://localhost:5173/line-callback`。
+- **Webhook（`POST /webhook`）**：LINE 連不到 localhost，用 `ngrok http 8000`，把 `https://xxxx.ngrok-free.app/webhook` 填到測試 Messaging channel 的 Webhook URL。
+  - 本機驗證：執行 `npm run start:dev` 啟動後端，在 LINE Developers 按 **Verify**，結果應為 Success。
+  - Verify 失敗時，先確認 `.env.local` 的 `LINE_MESSAGE_CHANNEL_SECRET`（或舊名稱 `CHANNEL_SECRET`）與該 channel 的 secret 一致。
+- **LINE Login**：前端 redirect URI 是 `${window.location.origin}/line-callback`，需在 LINE Login channel 的 Callback URL 與 `.env.local` 的 `LINE_LOGIN_REDIRECT_URIS` 同時加上 `http://localhost:5173/line-callback`。
 - 建議另開**測試用**的 Messaging API channel 與 LINE Login channel，避免改 webhook 時影響正式 Bot。
 
 ---
@@ -157,8 +167,13 @@ PG_IMAGE=postgres:18 ./scripts/pull-prod-db.sh
 | `POSTGRES_HOST` / `POSTGRES_PORT` / `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DATABASE` | TypeORM 連線設定（`src/app.module.ts`） |
 | `DB_HOST` | migration CLI 用的連線字串（`database/ormconfig.ts`） |
 | `DB_SSL` | 設為 `false` 關閉 SSL（本機用） |
-| `CHANNEL_SECRET` | LINE webhook 簽章驗證（`src/app.module.ts` 的 LINE middleware） |
-| `CHANNEL_ACCESS_TOKEN` | LINE Messaging API 呼叫用 token（`line.service.ts`） |
+| `NODE_ENV` | 本機設為 `development`（或 `test`）才允許 `http://localhost` 作為 LINE Login 回呼網址；正式環境不得設定 |
+| `LINE_MESSAGE_CHANNEL_SECRET` | Messaging API channel secret，webhook 簽章驗證（`src/middleware/line-signature.middleware.ts`）。未設定時退回 `CHANNEL_SECRET` |
+| `LINE_MESSAGE_CHANNEL_ACCESS_TOKEN` | Messaging API 呼叫用 token（`line.service.ts`、`src/tools/upload_menu.ts`）。未設定時退回 `CHANNEL_ACCESS_TOKEN` |
+| `CHANNEL_SECRET` / `CHANNEL_ACCESS_TOKEN` | 舊名稱，僅作為相容用的備用，新名稱存在時不會使用 |
+| `LINE_LOGIN_CHANNEL_ID` | LINE Login channel ID，`POST /auth/line-login` 向 LINE 驗證時使用 |
+| `LINE_LOGIN_SECRET` | LINE Login channel secret，只存在後端；不會退回 Messaging 的 secret |
+| `LINE_LOGIN_REDIRECT_URIS` | LINE Login 回呼網址白名單，以逗號分隔，完全比對。每筆必須是 `https://`（本機 `development` / `test` 可用 `http://localhost`） |
 | `MONTHLY_SUMMARY_TARGET_SOCIAL_ID` | 月度 cron 產生報表後，接收 LINE 通知的帳號（`data.controller.ts`） |
 | `BLOB_READ_WRITE_TOKEN` | Vercel Blob 存取 token，月報 PDF 上傳時使用（`@vercel/blob` 預設讀取） |
 
@@ -175,6 +190,7 @@ PG_IMAGE=postgres:18 ./scripts/pull-prod-db.sh
 | `npm run format` | Prettier 格式化 `src/`、`test/` |
 | `npm run lint` | ESLint，會以 `--fix` 自動修改 `src/`、`apps/`、`libs/`、`test/` |
 | `npm test` / `npm run test:watch` / `npm run test:cov` | Jest 單元測試 |
+| `npm test -- src/middleware src/config src/services/line-login.service.spec.ts src/dto src/controllers/auth.controller.spec.ts` | 只跑 LINE 相關的單元測試（`npm test` 即 `jest`，後面的路徑直接傳給 Jest） |
 | `npm run test:e2e` | Jest e2e 測試 |
 | `npm run typeorm:show` | 列出 migration 執行狀態 |
 | `npm run typeorm:generate --name=XXX` | 依 entity 差異產生新 migration（`database/migrations/XXX-*.ts`） |
@@ -193,6 +209,8 @@ PG_IMAGE=postgres:18 ./scripts/pull-prod-db.sh
 - **開課課程**：團體課程排程（`OpeningCourse`）。
 - **月報 PDF**：個人計畫簽到統計與團體課程簽到統計。每月 1 日由 Vercel Cron 自動產生並推送（見 `vercel.json`），亦可由 LINE 傳送「產生報表」取得。
 - **LINE 指令「產生報表」**：只限**已綁定 `socialId` 的教練**，且必須在與官方帳號的**一對一聊天**中使用；其他身分或聊天室會收到提示訊息，不會產生報表。
+- **Webhook 簽章驗證**：`POST /webhook` 會驗證 LINE 簽章。簽章缺少或不正確時回 401；後端簽章設定缺失時回 500。
+- **LINE 登入**：前端把授權碼交給後端 `POST /auth/line-login` 換取身分，只回傳 `userId` 與 `displayName`，不回傳任何 token。前端以一次性的隨機 `state` / `nonce` 防止登入 CSRF，並在回呼時驗證。
 
 ### 訓練計畫備註（`note`）
 
@@ -253,7 +271,9 @@ PG_IMAGE=postgres:18 ./scripts/pull-prod-db.sh
    - 重新產生月報時使用當下的備註。
    - 月報可能被轉傳，請**勿填寫醫療或敏感個人資料**。
    - 「產生報表」只限教練，且須在與官方帳號的一對一聊天中使用，教練的 LINE 帳號必須已綁定（`Coach.socialId`）。
-3. 確認正式環境的 `CHANNEL_SECRET` 已設定（webhook 簽章驗證依賴它）。
+3. **Messaging secret 一致**：正式環境實際生效的 `LINE_MESSAGE_CHANNEL_SECRET`（或舊名稱 `CHANNEL_SECRET`）必須與 LINE Console 中 Messaging API channel 的 secret **完全一致**。Vercel 有設定時以 Vercel 為準，否則是被追蹤的 `.env` 中的值。不一致時 webhook 會全部被拒絕。
+4. **LINE Login 白名單**：`LINE_LOGIN_REDIRECT_URIS` 列出所有正式入口的 `/line-callback` 網址（例如 `https://<正式網域>/line-callback`），且不含 `localhost` 或 `127.0.0.1`。
+5. **明確設定 LINE 變數**：Vercel 未設定的變數會退回被追蹤的 `.env`，因此 Production 與 Preview 的 LINE 相關變數都要在 Vercel 明確設定。
 
 ### 回退（Rollback）
 
@@ -261,6 +281,26 @@ PG_IMAGE=postgres:18 ./scripts/pull-prod-db.sh
 - 已上傳的月報 PDF 不會因回退而自動更新或移除。
 - 快取中的新版前端若送出 `note`，舊後端會丟棄該欄位，請先回退前端並重新整理。
 - `npm run typeorm:revert` 會**永久刪除所有備註資料**，只在確定要移除此功能時使用。執行前請先以 JSON 格式備份（`umask 077` 下使用 `psql -At -c "SELECT COALESCE(json_agg(json_build_object('id', id, 'note', note) ORDER BY id), '[]') FROM \"TrainingPlan\" WHERE note <> ''" -o <路徑>`），備份放在專案目錄外且未同步雲端的位置，用完即刪。
+
+### LINE 登入與 Webhook 部署
+
+依下列順序進行（前端與後端的 LINE 變數都必須先完成「部署前檢查」）：
+
+1. **Webhook 簽章驗證**（後端）：部署後**立即**在正式 channel 按 **Verify**，需為 Success，再傳一則測試訊息確認正常回應。失敗時使用 Vercel Instant Rollback。
+2. **LINE Login 後端**（`POST /auth/line-login`）：在 Vercel Production 設定 `LINE_LOGIN_CHANNEL_ID`、`LINE_LOGIN_SECRET`、`LINE_LOGIN_REDIRECT_URIS`，部署後以 curl 確認不合法的請求會被拒絕。
+3. **Managment_Web 前端**：先從所有 Vercel 環境（Production、Preview、Development）刪除 `VITE_LINE_CHANNEL_SECRET`，再以**不使用 build cache** 的方式部署，並測試登入與教練綁定。
+4. **輪替 LINE Login secret**（由使用者手動執行，建議離峰時段）：
+   - LINE Developers → LINE Login channel → **Basic settings** → **Channel secret** → **Issue**。
+   - 從 Issue 到第 5 步完成之間，LINE 登入會失敗。
+   - 在 Vercel 把 Production 的 `LINE_LOGIN_SECRET` 更新為新值，然後重新部署後端（env 變更需要重新部署才會生效）。
+   - 完成一次正式環境登入，確認恢復正常。
+   - 刪除輪替前建置、含有舊 secret 的前端部署（包含 Preview）。
+
+回滾限制：
+
+- 完成第 3 步之後，前端不得回退到仍含 `VITE_LINE_CHANNEL_SECRET` 的版本。
+- 後端可回退到第 1 步之後的任一版本，不得回退到 webhook 簽章驗證修正之前的版本。
+- Vercel Preview 無法使用 LINE 登入，因為 Preview 網址不在 `LINE_LOGIN_REDIRECT_URIS` 中。
 
 ## 相關專案
 

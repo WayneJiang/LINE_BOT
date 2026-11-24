@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import { messagingApi } from "@line/bot-sdk";
 import * as dotenv from "dotenv";
+import { readMessagingAccessTokenFromEnv } from "../config/line-messaging.config";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { readFileSync } from "node:fs";
 
@@ -8,7 +9,7 @@ import { readFileSync } from "node:fs";
 dotenv.config({ path: join(__dirname, "../../.env") });
 
 const clientConfig = {
-  channelAccessToken: process.env.CHANNEL_ACCESS_TOKEN || "",
+  channelAccessToken: readMessagingAccessTokenFromEnv(process.env),
 };
 
 const client = new messagingApi.MessagingApiClient(clientConfig);

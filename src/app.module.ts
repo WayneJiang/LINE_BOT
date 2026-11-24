@@ -2,13 +2,21 @@ import {
   Module,
   NestModule,
   MiddlewareConsumer,
-  RequestMethod,
   OnModuleInit,
+  Logger,
 } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { LineController } from "./controllers/line.controller";
 import { LineService } from "./services/line.service";
-import { middleware, MiddlewareConfig } from "@line/bot-sdk";
+import { AuthController } from "./controllers/auth.controller";
+import { LineLoginService } from "./services/line-login.service";
+import {
+  MESSAGING_SECRET_LEGACY_NAME,
+  MESSAGING_SECRET_NAME,
+  readMessagingSecret,
+} from "./config/line-messaging.config";
+import { readLineLoginConfig } from "./services/line-login.config";
+import { LineSignatureMiddleware } from "./middleware/line-signature.middleware";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { DataSource } from "typeorm";
 import { DataController } from "./controllers/data.controller";
@@ -51,8 +59,8 @@ import { Coach } from "./entities/coach.entity";
       OpeningCourse,
     ]),
   ],
-  controllers: [LineController, DataController],
-  providers: [LineService, DataService, PdfService],
+  controllers: [LineController, DataController, AuthController],
+  providers: [LineService, DataService, PdfService, LineLoginService],
 })
 export class AppModule implements NestModule, OnModuleInit {
   constructor(
@@ -60,18 +68,22 @@ export class AppModule implements NestModule, OnModuleInit {
     private dataSource: DataSource,
   ) {}
   configure(consumer: MiddlewareConsumer) {
-    const channelSecret = this.configService.get<string>("CHANNEL_SECRET");
-
-    const middlewareConfig: MiddlewareConfig = {
-      channelSecret: channelSecret || "",
-    };
-
-    consumer
-      .apply(middleware(middlewareConfig))
-      .forRoutes({ path: "/line/*path", method: RequestMethod.ALL });
+    consumer.apply(LineSignatureMiddleware).forRoutes(LineController);
   }
 
   async onModuleInit() {
+    // 只輸出問題類別（不含任何設定值），不中止啟動
+    const startupLogger = new Logger(AppModule.name);
+    if (!readMessagingSecret(this.configService)) {
+      startupLogger.warn(
+        `WARNING: ${MESSAGING_SECRET_NAME} missing (also checked ${MESSAGING_SECRET_LEGACY_NAME})`,
+      );
+    }
+    const loginConfig = readLineLoginConfig(this.configService);
+    if (!loginConfig.config) {
+      startupLogger.warn(`WARNING: LINE Login config ${loginConfig.problem}`);
+    }
+
     try {
       await this.dataSource.query("SELECT 1");
       console.log("✅ Database connected successfully!");

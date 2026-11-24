@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import { readMessagingAccessToken } from "../config/line-messaging.config";
 import { ConfigService } from "@nestjs/config";
 import { messagingApi, webhook } from "@line/bot-sdk";
 import { InjectRepository } from "@nestjs/typeorm";
@@ -39,12 +40,8 @@ export class LineService {
     @InjectRepository(OpeningCourse)
     private openingCourseRepository: Repository<OpeningCourse>,
   ) {
-    const channelAccessToken = this.configService.get<string>(
-      "CHANNEL_ACCESS_TOKEN",
-    );
-
     const clientConfig = {
-      channelAccessToken: channelAccessToken || "",
+      channelAccessToken: readMessagingAccessToken(this.configService),
     };
 
     this.messagingApiClient = new messagingApi.MessagingApiClient(clientConfig);
