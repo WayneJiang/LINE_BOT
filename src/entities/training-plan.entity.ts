@@ -32,6 +32,9 @@ export class TrainingPlan {
   @Column({ default: 0 })
   quota: number;
 
+  @Column({ default: "" })
+  note: string;
+
   @CreateDateColumn()
   createdDate: Date;
 

@@ -498,7 +498,7 @@ export class LineService {
         });
         break;
       case "產生報表":
-        await this.generateAndSendMonthlySummary(replyToken);
+        await this.generateAndSendMonthlySummary(replyToken, event.source);
         break;
     }
 
@@ -783,10 +783,18 @@ export class LineService {
 
         if (trainingPlan.quota - usedQuota === 1) {
           trainingPlan.end = dayjs().toDate();
+          // 只更新變更的欄位，避免用載入時的舊值覆蓋同時被編輯的備註 / 額度
+          await this.trainingPlanRepository.update(
+            { id: trainingPlan.id },
+            { end: trainingPlan.end },
+          );
         } else {
           trainingPlan.start = dayjs().toDate();
+          await this.trainingPlanRepository.update(
+            { id: trainingPlan.id },
+            { start: trainingPlan.start },
+          );
         }
-        await this.trainingPlanRepository.save(trainingPlan);
 
         await this.messagingApiClient.replyMessage({
           replyToken: replyToken,
@@ -961,7 +969,35 @@ export class LineService {
     });
   }
 
-  async generateAndSendMonthlySummary(replyToken: string): Promise<void> {
+  async generateAndSendMonthlySummary(
+    replyToken: string,
+    source: webhook.Source,
+  ): Promise<void> {
+    const LINE_USER_ID = /^U[0-9a-f]{32}$/;
+
+    // 1. 只允許一對一聊天（群組 / 多人聊天室中的連結會被其他成員看到）
+    if (source?.type !== "user") {
+      await this.messagingApiClient.replyMessage({
+        replyToken,
+        messages: [{ type: "text", text: "請於一對一聊天中使用此功能" }],
+      });
+      return;
+    }
+
+    // 2. 先驗證 userId 格式（涵蓋 undefined、""、空白等），再查詢教練身分
+    const socialId = source.userId;
+    const isCoach =
+      typeof socialId === "string" && LINE_USER_ID.test(socialId)
+        ? (await this.dataService.getBySocialId(socialId)).coach
+        : false;
+    if (!isCoach) {
+      await this.messagingApiClient.replyMessage({
+        replyToken,
+        messages: [{ type: "text", text: "此功能僅限教練使用" }],
+      });
+      return;
+    }
+
     const result = await this.dataService.generateMonthlySummaryPdfs();
 
     if (!result) {

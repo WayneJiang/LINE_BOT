@@ -28,6 +28,7 @@ interface MonthlySummaryRaw {
   quota: number;
   checkinCount: number;
   checkinDates: string;
+  notes: { id: number; note: string }[] | null;
 }
 
 interface YearlySummaryRaw {
@@ -290,6 +291,7 @@ export class DataService {
       const trainingPlan = this.trainingPlanRepository.create({
         planType: body.planType,
         quota: body.quota,
+        note: body.note ?? "",
         trainee: trainee,
         coach: coach,
         editor: editor,
@@ -357,6 +359,7 @@ export class DataService {
         {
           planType: body.planType,
           quota: body.quota,
+          ...(body.note !== undefined && { note: body.note }),
           coach: coach,
           editor: editor,
         },
@@ -639,6 +642,7 @@ export class DataService {
       quota: number;
       checkinCount: number;
       checkinDates: string;
+      notes: string[];
     }[]
   > {
     try {
@@ -674,13 +678,22 @@ export class DataService {
           `STRING_AGG(TO_CHAR(${localCreated}, 'MM/DD'), CHR(10) ORDER BY ${localCreated})`,
           "checkinDates",
         )
+        // 以 (計畫 id, 備註) 為單位彙總，join 簽到紀錄造成的重複列會被 DISTINCT 合併
+        .addSelect(
+          `JSONB_AGG(DISTINCT JSONB_BUILD_OBJECT('id', "trainingPlan"."id", 'note', "trainingPlan"."note")) FILTER (WHERE "trainingPlan"."note" <> '')`,
+          "notes",
+        )
         .groupBy("coach.name")
+        .addGroupBy("coach.id")
         .addGroupBy("trainee.name")
+        .addGroupBy("trainee.id")
         .addGroupBy("trainingPlan.planType")
         .addGroupBy(`DATE_TRUNC('month', ${localCreated})`)
         .addGroupBy("trainingPlan.quota")
         .orderBy("coach.name", "ASC")
+        .addOrderBy("coach.id", "ASC")
         .addOrderBy("trainee.name", "ASC")
+        .addOrderBy("trainee.id", "ASC")
         .getRawMany<MonthlySummaryRaw>();
 
       return results.map((result) => ({
@@ -691,6 +704,9 @@ export class DataService {
         quota: Number(result.quota),
         checkinCount: Number(result.checkinCount),
         checkinDates: result.checkinDates || "",
+        notes: [...(result.notes ?? [])]
+          .sort((a, b) => a.id - b.id)
+          .map((item) => item.note),
       }));
     } catch (error) {
       // 不吞掉錯誤，避免查詢失敗被誤判成「無上月資料」

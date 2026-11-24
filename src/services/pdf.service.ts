@@ -16,6 +16,7 @@ export interface MonthlySummaryRow {
   quota: number;
   checkinCount: number;
   checkinDates: string;
+  notes: string[];
 }
 
 export interface GroupFitnessSummaryRow {
@@ -40,6 +41,8 @@ interface TableColumn {
   /** 佔可用寬度的比例，一張表加總為 1 */
   ratio: number;
   align?: "left" | "center" | "right";
+  /** 儲存格內容為空字串時顯示的文字，預設為「—」 */
+  emptyText?: string;
 }
 
 interface StatCard {
@@ -218,15 +221,19 @@ export class PdfService {
     rows.forEach((cells, rowIndex) => {
       pdfDocument.font("NotoSansTC").fontSize(LAYOUT.bodyFontSize);
 
-      const rowHeight =
-        Math.max(
-          ...cells.map((cell, index) =>
-            pdfDocument.heightOfString(cell || "—", {
+      // 顯示文字（量測必須在本文字型與字級設定之後）
+      const shown = cells.map(
+        (cell, index) => cell || (columns[index].emptyText ?? "—"),
+      );
+      const cellHeights = shown.map((text, index) =>
+        // 空字串不量測、不繪製，也不納入列高
+        text === ""
+          ? 0
+          : pdfDocument.heightOfString(text, {
               width: widths[index] - LAYOUT.cellPadding * 2,
             }),
-          ),
-        ) +
-        LAYOUT.cellPadding * 2;
+      );
+      const rowHeight = Math.max(...cellHeights) + LAYOUT.cellPadding * 2;
 
       if (y + rowHeight > limit) {
         pdfDocument.addPage();
@@ -245,16 +252,18 @@ export class PdfService {
 
       pdfDocument.fillColor(COLOR.text);
       let x = left;
-      cells.forEach((cell, index) => {
-        pdfDocument.text(
-          cell || "—",
-          x + LAYOUT.cellPadding,
-          y + LAYOUT.cellPadding,
-          {
-            width: widths[index] - LAYOUT.cellPadding * 2,
-            align: columns[index].align ?? "left",
-          },
-        );
+      shown.forEach((text, index) => {
+        if (text !== "") {
+          pdfDocument.text(
+            text,
+            x + LAYOUT.cellPadding,
+            y + LAYOUT.cellPadding,
+            {
+              width: widths[index] - LAYOUT.cellPadding * 2,
+              align: columns[index].align ?? "left",
+            },
+          );
+        }
         x += widths[index];
       });
 
@@ -390,12 +399,25 @@ export class PdfService {
         let y = this.drawPageHeader(pdfDocument, title, period);
 
         const columns: TableColumn[] = [
-          { header: "學員", ratio: 0.16 },
-          { header: "方案", ratio: 0.13, align: "center" },
+          { header: "學員", ratio: 0.14 },
+          { header: "方案", ratio: 0.12, align: "center" },
           { header: "額度", ratio: 0.08, align: "center" },
           { header: "次數", ratio: 0.08, align: "center" },
-          { header: "簽到日期", ratio: 0.55 },
+          { header: "簽到日期", ratio: 0.33 },
+          { header: "備註", ratio: 0.25, emptyText: "" },
         ];
+
+        // 備註前處理：換行與連續空白一律改成單一空白（PDF 不分行）；
+        // 多段（合併列）時每段加「• 」前綴並分行
+        const clean = (note: string) => note.replace(/\s+/g, " ").trim();
+        const formatNotes = (notes: string[]): string => {
+          const segments = [
+            ...new Set((notes ?? []).map(clean).filter(Boolean)),
+          ];
+          return segments.length <= 1
+            ? (segments[0] ?? "")
+            : segments.map((segment) => `• ${segment}`).join("\n");
+        };
 
         const body = coachRows.map((row) => [
           row.traineeName,
@@ -404,6 +426,7 @@ export class PdfService {
           String(row.checkinCount),
           // 原本一天一行，改成頓號串接後交給表格自動折行
           (row.checkinDates || "").split("\n").filter(Boolean).join("、"),
+          formatNotes(row.notes),
         ]);
 
         y = this.drawTable(pdfDocument, columns, body, y, (document) =>
